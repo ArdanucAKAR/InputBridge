@@ -3,7 +3,7 @@ using Forms = System.Windows.Forms;
 
 namespace InputBridge.Windows;
 
-public partial class App : Application
+public partial class App : System.Windows.Application
 {
     public static AppRuntime Runtime { get; private set; } = null!;
     private Forms.NotifyIcon? _tray;
