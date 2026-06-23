@@ -24,11 +24,11 @@ targets:
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: YES
     dependencies:
-      - framework: SwiftUI.framework
-      - framework: CoreBluetooth.framework
-      - framework: Security.framework
-      - framework: ServiceManagement.framework
-      - framework: IOBluetooth.framework
+      - sdk: SwiftUI.framework
+      - sdk: CoreBluetooth.framework
+      - sdk: Security.framework
+      - sdk: ServiceManagement.framework
+      - sdk: IOBluetooth.framework
     scheme:
       testTargets: []
       gatherCoverageData: false
