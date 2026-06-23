@@ -77,8 +77,12 @@ public sealed class ControllerServer : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_app is not null) await _app.StopAsync();
-        _app?.Dispose();
+        if (_app is null) return;
+
+        var app = _app;
+        _app = null;
+        await app.StopAsync();
+        await app.DisposeAsync();
     }
 
     private sealed record PairRequest(Guid ClientId, string? ClientName);

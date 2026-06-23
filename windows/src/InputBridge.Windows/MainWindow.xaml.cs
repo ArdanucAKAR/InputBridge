@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
+using WpfMessageBox = System.Windows.MessageBox;
 
 namespace InputBridge.Windows;
 
@@ -51,7 +52,7 @@ public partial class MainWindow : Window
     private async Task Apply(ProfileMode profile)
     {
         try { await _runtime.ApplyProfileAsync(profile); RefreshStatus(); }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "InputBridge", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) { WpfMessageBox.Show(ex.Message, "InputBridge", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private void RefreshMonitors_Click(object sender, RoutedEventArgs e) => RefreshMonitors();
@@ -62,9 +63,9 @@ public partial class MainWindow : Window
         {
             _runtime.SaveMonitorRows(_monitors);
             RefreshMonitors();
-            MessageBox.Show("Monitor setup saved.", "InputBridge");
+            WpfMessageBox.Show("Monitor setup saved.", "InputBridge");
         }
-        catch (Exception ex) { MessageBox.Show(ex.Message, "InputBridge", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) { WpfMessageBox.Show(ex.Message, "InputBridge", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private void ApprovePairing_Click(object sender, RoutedEventArgs e)

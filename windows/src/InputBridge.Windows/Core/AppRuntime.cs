@@ -7,6 +7,7 @@ public sealed class AppRuntime
     private readonly SemaphoreSlim _profileGate = new(1, 1);
     private ControllerServer? _server;
     private DiscoveryResponder? _discovery;
+    private int _stopped;
 
     public AppSettings Settings { get; }
     public PairingService PairingService { get; }
@@ -32,8 +33,20 @@ public sealed class AppRuntime
 
     public async Task StopAsync()
     {
-        if (_discovery is not null) await _discovery.DisposeAsync();
-        if (_server is not null) await _server.DisposeAsync();
+        if (System.Threading.Interlocked.Exchange(ref _stopped, 1) != 0) return;
+
+        if (_discovery is not null)
+        {
+            await _discovery.DisposeAsync();
+            _discovery = null;
+        }
+
+        if (_server is not null)
+        {
+            await _server.DisposeAsync();
+            _server = null;
+        }
+
         _profileGate.Dispose();
     }
 
