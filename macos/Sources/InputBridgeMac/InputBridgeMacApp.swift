@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 @main
 struct InputBridgeMacApp: App {
@@ -14,7 +15,7 @@ struct InputBridgeMacApp: App {
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
                 Toggle("Automation enabled", isOn: $model.automationEnabled)
-                    .onChange(of: model.automationEnabled) { _, value in
+                    .onChange(of: model.automationEnabled) { value in
                         UserDefaults.standard.set(value, forKey: "automation-enabled")
                     }
                 Toggle("Launch at login", isOn: Binding(
@@ -26,7 +27,13 @@ struct InputBridgeMacApp: App {
                 Button("Apply Mac profile") { Task { await model.apply(.mac) } }
                     .disabled(model.busy)
                 Divider()
-                SettingsLink { Text("Open setup…") }
+                Button("Open setup…") {
+                    NSApp.sendAction(
+                        Selector(("showSettingsWindow:")),
+                        to: nil,
+                        from: nil
+                    )
+                }
                 Button("Quit") { NSApplication.shared.terminate(nil) }
             }
             .padding(12)
