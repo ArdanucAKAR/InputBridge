@@ -1,0 +1,127 @@
+name: Build and release installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without v prefix (example: 0.2.0)"
+        required: true
+        default: "0.2.0"
+      create_release:
+        description: "Create a draft GitHub release"
+        required: true
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: inputbridge-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: 8.0.x
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      should_release: ${{ steps.release.outputs.value }}
+    steps:
+      - id: version
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          fi
+      - id: release
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" || "${{ inputs.create_release }}" == "true" ]]; then
+            echo "value=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  windows:
+    needs: metadata
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore and build Windows controller
+        shell: pwsh
+        run: |
+          dotnet restore ./windows/src/InputBridge.Windows/InputBridge.Windows.csproj
+          dotnet build ./windows/src/InputBridge.Windows/InputBridge.Windows.csproj -c Release --no-restore
+      - name: Publish Windows controller
+        shell: pwsh
+        run: ./windows/scripts/publish-windows.ps1 -Version "${{ needs.metadata.outputs.version }}"
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+      - name: Create installer
+        shell: pwsh
+        run: iscc "/DMyAppVersion=${{ needs.metadata.outputs.version }}" ./windows/installer/InputBridge.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InputBridge-Windows
+          if-no-files-found: error
+          path: windows/dist/installer/InputBridge-Windows-Setup.exe
+
+  macos:
+    needs: metadata
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build macOS application and DMG
+        env:
+          INPUTBRIDGE_VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          chmod +x macos/scripts/package-macos.sh
+          macos/scripts/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: InputBridge-macOS
+          if-no-files-found: error
+          path: macos/dist/InputBridge-macOS.dmg
+
+  release:
+    if: needs.metadata.outputs.should_release == 'true'
+    needs: [metadata, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        shell: bash
+        run: |
+          TAG="v${VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              artifacts/InputBridge-Windows/InputBridge-Windows-Setup.exe \
+              artifacts/InputBridge-macOS/InputBridge-macOS.dmg \
+              --clobber
+          else
+            gh release create "$TAG" \
+              artifacts/InputBridge-Windows/InputBridge-Windows-Setup.exe \
+              artifacts/InputBridge-macOS/InputBridge-macOS.dmg \
+              --title "InputBridge ${TAG}" \
+              --generate-notes \
+              --target "$GITHUB_SHA"
+          fi

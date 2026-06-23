@@ -1,0 +1,25 @@
+# Build output
+**/bin/
+**/obj/
+**/.build/
+**/.swiftpm/
+**/dist/
+*.user
+*.suo
+.DS_Store
+
+# Local secrets and settings
+*.local.json
+*.p12
+*.mobileprovision
+
+# Xcode and local macOS build products
+macos/InputBridgeMac.xcodeproj/
+macos/*.xcworkspace/
+macos/.build/
+macos/DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Installer temporary output
+windows/dist/

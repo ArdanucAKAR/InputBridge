@@ -1,0 +1,38 @@
+name: Bug report
+description: Report an InputBridge problem
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include pairing tokens, device MAC addresses, or private IP addresses."
+  - type: input
+    id: version
+    attributes:
+      label: InputBridge version
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Windows Controller, macOS Companion, Both]
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and relevant logs
+    validations:
+      required: true
