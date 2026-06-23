@@ -25,7 +25,6 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
     dependencies:
       - sdk: SwiftUI.framework
-      - sdk: AppKit.framework
       - sdk: CoreBluetooth.framework
       - sdk: Security.framework
       - sdk: ServiceManagement.framework

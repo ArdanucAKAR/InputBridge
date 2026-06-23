@@ -3,9 +3,7 @@ import Darwin
 
 final class DiscoveryService: ObservableObject {
     @Published private(set) var offers: [ControllerOffer] = []
-
-    private let multicastGroup = "239.255.77.77"
-    private let limitedBroadcast = "255.255.255.255"
+    private let group = "239.255.77.77"
     private let port: UInt16 = 41716
     private var fd: Int32 = -1
     private var readSource: DispatchSourceRead?
@@ -15,24 +13,17 @@ final class DiscoveryService: ObservableObject {
 
     func start() {
         guard fd < 0 else { return }
-
         fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         guard fd >= 0 else { return }
-
         var reuse: Int32 = 1
-        var broadcast: Int32 = 1
         setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, socklen_t(MemoryLayout<Int32>.size))
-        setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &broadcast, socklen_t(MemoryLayout<Int32>.size))
-
         var bindAddress = sockaddr_in()
         bindAddress.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         bindAddress.sin_family = sa_family_t(AF_INET)
         bindAddress.sin_port = 0
         bindAddress.sin_addr = in_addr(s_addr: INADDR_ANY.bigEndian)
         withUnsafePointer(to: &bindAddress) { pointer in
-            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                _ = Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size))
-            }
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { _ = Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
         }
 
         let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
@@ -53,30 +44,14 @@ final class DiscoveryService: ObservableObject {
         if fd >= 0 { close(fd); fd = -1 }
     }
 
-    func upsert(_ offer: ControllerOffer) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.offers.removeAll { $0.controllerId == offer.controllerId }
-            self.offers.append(offer)
-            self.offers.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        }
-    }
-
     private func sendDiscover() {
         let message: [String: Any] = ["protocol": 1, "type": "discover", "nonce": nonce]
         guard let data = try? JSONSerialization.data(withJSONObject: message) else { return }
-
-        send(data, to: multicastGroup)
-        send(data, to: limitedBroadcast)
-    }
-
-    private func send(_ data: Data, to host: String) {
         var destination = sockaddr_in()
         destination.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         destination.sin_family = sa_family_t(AF_INET)
         destination.sin_port = port.bigEndian
-        destination.sin_addr = in_addr(s_addr: inet_addr(host))
-
+        destination.sin_addr = in_addr(s_addr: inet_addr(group))
         data.withUnsafeBytes { bytes in
             withUnsafePointer(to: &destination) { pointer in
                 pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {
@@ -96,7 +71,6 @@ final class DiscoveryService: ObservableObject {
             }
         }
         guard count > 0 else { return }
-
         let data = Data(buffer.prefix(Int(count)))
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               (json["type"] as? String) == "offer",
@@ -109,13 +83,13 @@ final class DiscoveryService: ObservableObject {
         var address = remote.sin_addr
         var chars = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
         guard inet_ntop(AF_INET, &address, &chars, socklen_t(INET_ADDRSTRLEN)) != nil else { return }
-
-        upsert(ControllerOffer(
-            controllerId: controllerId,
-            name: name,
-            host: String(cString: chars),
-            httpPort: httpPort,
-            lastSeen: Date()
-        ))
+        let host = String(cString: chars)
+        let offer = ControllerOffer(controllerId: controllerId, name: name, host: host, httpPort: httpPort, lastSeen: Date())
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.offers.removeAll { $0.controllerId == offer.controllerId }
+            self.offers.append(offer)
+            self.offers.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
     }
 }

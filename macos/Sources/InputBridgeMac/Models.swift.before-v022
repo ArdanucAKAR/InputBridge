@@ -39,20 +39,6 @@ struct PairStatusResponse: Codable {
 struct StoredController: Codable {
     let controllerId: UUID
     var name: String
-    var host: String?
-    var httpPort: Int?
-    var lastSeen: Date?
-
-    func asOffer() -> ControllerOffer? {
-        guard let host, let httpPort, (1...65535).contains(httpPort) else { return nil }
-        return ControllerOffer(
-            controllerId: controllerId,
-            name: name,
-            host: host,
-            httpPort: httpPort,
-            lastSeen: lastSeen ?? .distantPast
-        )
-    }
 }
 
 struct ControllerProfileResponse: Codable {

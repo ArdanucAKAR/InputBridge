@@ -11,8 +11,6 @@ final class AppModel: ObservableObject {
     @Published var launchAtLogin = UserDefaults.standard.bool(forKey: "launch-at-login")
     @Published var keyboardPattern = UserDefaults.standard.string(forKey: "keyboard-name-pattern") ?? "G915|G913"
     @Published var z407Enabled = UserDefaults.standard.object(forKey: "z407-enabled") as? Bool ?? true
-    @Published var manualHost = UserDefaults.standard.string(forKey: "manual-controller-host") ?? ""
-    @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
 
     let discovery = DiscoveryService()
     let controller = ControllerClient()
@@ -31,7 +29,7 @@ final class AppModel: ObservableObject {
 
     var selectedOffer: ControllerOffer? {
         guard let stored = controller.storedController else { return nil }
-        return discovery.offers.first { $0.controllerId == stored.controllerId } ?? stored.asOffer()
+        return discovery.offers.first { $0.controllerId == stored.controllerId }
     }
 
     func pair(_ offer: ControllerOffer) async {
@@ -40,21 +38,6 @@ final class AppModel: ObservableObject {
             status = "Waiting for Windows approval…"
             try await controller.pair(with: offer)
             status = "Paired with \(offer.name)."
-        }
-    }
-
-    func checkManualController() async {
-        await run { [weak self] in
-            guard let self else { return }
-            guard let port = Int(manualPort.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-                throw AppError.invalidManualPort
-            }
-            status = "Checking Windows controller…"
-            let offer = try await controller.probe(host: manualHost, port: port)
-            UserDefaults.standard.set(manualHost, forKey: "manual-controller-host")
-            UserDefaults.standard.set(String(port), forKey: "manual-controller-port")
-            discovery.upsert(offer)
-            status = "Found \(offer.name) at \(offer.host):\(offer.httpPort)."
         }
     }
 
@@ -124,23 +107,14 @@ final class AppModel: ObservableObject {
         guard !busy else { return }
         busy = true
         defer { busy = false }
-        do {
-            try await action()
-        } catch {
-            status = error.localizedDescription
-        }
+        do { try await action() }
+        catch { status = error.localizedDescription }
     }
 
     enum AppError: LocalizedError {
-        case controllerNotFound, invalidManualPort
-
+        case controllerNotFound
         var errorDescription: String? {
-            switch self {
-            case .controllerNotFound:
-                return "No paired Windows controller is available. Open setup to pair or check a known address."
-            case .invalidManualPort:
-                return "Enter a valid controller port, usually 41715."
-            }
+            "The paired Windows controller is not currently discoverable on this local network."
         }
     }
 }
