@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- macOS Z407 adapter completes the BLE handshake, switches source, then disconnects so the speaker is not left in a stuck remote session across profile changes.
+- macOS Z407 discovery scans in parallel with reconnect, keeps the control session after a successful handshake, and no longer blocks monitor switching if the speaker is missing.
 
 ## 0.2.0
 

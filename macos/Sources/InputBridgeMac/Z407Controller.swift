@@ -18,9 +18,10 @@ final class Z407Controller: NSObject, ObservableObject {
     private var pendingMode: ProfileMode?
     private var timeout: DispatchWorkItem?
     private var settle: DispatchWorkItem?
+    private var retrieveFallback: DispatchWorkItem?
     private var phase: Phase = .idle
-    private var awaitingDisconnectToReconnect = false
-    private var usedScan = false
+    private var droppingRetrieve = false
+    private var scanning = false
 
     private enum Phase {
         case idle
@@ -29,7 +30,6 @@ final class Z407Controller: NSObject, ObservableObject {
         case handshakeAck
         case handshakeReady
         case switching
-        case disconnecting
     }
 
     override init() {
@@ -57,39 +57,37 @@ final class Z407Controller: NSObject, ObservableObject {
 
         pendingMode = mode
         self.continuation = continuation
-        phase = .connecting
-        awaitingDisconnectToReconnect = false
-        usedScan = false
-        command = nil
-        response = nil
-        updateStatus("Searching for Z407…")
         startTimeout()
 
-        if let peripheral, peripheral.state == .connected || peripheral.state == .connecting {
-            awaitingDisconnectToReconnect = true
-            central.cancelPeripheralConnection(peripheral)
+        if let peripheral, peripheral.state == .connected, let command {
+            writeSource(mode, using: peripheral, characteristic: command)
+            succeedKeepSession()
             return
         }
 
-        peripheral = nil
+        phase = .connecting
+        droppingRetrieve = false
+        updateStatus("Searching for Z407…")
+
+        if let peripheral, peripheral.state == .connected {
+            peripheral.delegate = self
+            peripheral.discoverServices([serviceUUID])
+            return
+        }
+
         connectToSpeaker()
     }
 
     private func connectToSpeaker() {
-        central.stopScan()
-
-        let connected = central.retrieveConnectedPeripherals(withServices: [serviceUUID])
-        if let match = connected.first {
-            attachAndConnect(match)
-            return
-        }
-
-        if let storedID, let match = central.retrievePeripherals(withIdentifiers: [storedID]).first {
-            attachAndConnect(match)
-            return
-        }
-
         beginScan()
+
+        if let match = central.retrieveConnectedPeripherals(withServices: [serviceUUID]).first {
+            attachAndConnect(match)
+        } else if let storedID, let match = central.retrievePeripherals(withIdentifiers: [storedID]).first {
+            attachAndConnect(match)
+        }
+
+        scheduleRetrieveFallback()
     }
 
     private func attachAndConnect(_ peripheral: CBPeripheral) {
@@ -100,6 +98,10 @@ final class Z407Controller: NSObject, ObservableObject {
 
         switch peripheral.state {
         case .connected:
+            retrieveFallback?.cancel()
+            retrieveFallback = nil
+            central.stopScan()
+            scanning = false
             peripheral.discoverServices([serviceUUID])
         case .connecting:
             break
@@ -109,53 +111,87 @@ final class Z407Controller: NSObject, ObservableObject {
     }
 
     private func beginScan() {
-        usedScan = true
+        scanning = true
         central.stopScan()
-        central.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        central.scanForPeripherals(withServices: [serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+    }
+
+    private func scheduleRetrieveFallback() {
+        retrieveFallback?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.phase == .connecting, self.continuation != nil else { return }
+            guard self.peripheral?.state != .connected else { return }
+            self.dropRetrieveAndKeepScanning()
+        }
+        retrieveFallback = work
+        queue.asyncAfter(deadline: .now() + 2, execute: work)
+    }
+
+    private func dropRetrieveAndKeepScanning() {
+        retrieveFallback = nil
+        if let peripheral, peripheral.state != .connected {
+            droppingRetrieve = true
+            central.cancelPeripheralConnection(peripheral)
+            self.peripheral = nil
+            command = nil
+            response = nil
+        }
+        updateStatus("Searching for Z407…")
+        if !scanning { beginScan() }
     }
 
     private func startHandshake() {
         guard phase == .connecting, let peripheral, let response else { return }
+        retrieveFallback?.cancel()
+        retrieveFallback = nil
         if response.isNotifying {
             sendHandshakeInitiate()
             return
         }
         peripheral.setNotifyValue(true, for: response)
+        scheduleHandshakeCommandFallback()
     }
 
     private func sendHandshakeInitiate() {
         guard phase == .connecting, let peripheral, let command else { return }
         phase = .handshakeInitiate
         peripheral.writeValue(Data([0x84, 0x05]), for: command, type: .withoutResponse)
+        scheduleHandshakeCommandFallback()
+    }
+
+    private func writeSource(_ mode: ProfileMode, using peripheral: CBPeripheral, characteristic: CBCharacteristic) {
+        let commandData = mode == .mac ? Data([0x81, 0x01]) : Data([0x81, 0x02])
+        peripheral.writeValue(commandData, for: characteristic, type: .withoutResponse)
+        updateStatus(mode == .mac ? "Z407 source: Bluetooth" : "Z407 source: AUX")
     }
 
     private func sendSourceCommand() {
         settle?.cancel()
-        guard phase == .handshakeReady || phase == .handshakeAck, let peripheral, let command, let mode = pendingMode else { return }
+        guard phase == .connecting || phase == .handshakeInitiate || phase == .handshakeAck || phase == .handshakeReady,
+              let peripheral, let command, let mode = pendingMode else { return }
         phase = .switching
-        let commandData = mode == .mac ? Data([0x81, 0x01]) : Data([0x81, 0x02])
-        peripheral.writeValue(commandData, for: command, type: .withoutResponse)
-        updateStatus(mode == .mac ? "Z407 source: Bluetooth" : "Z407 source: AUX")
+        writeSource(mode, using: peripheral, characteristic: command)
         startSettleTimeout()
     }
 
     private func handleResponse(_ data: Data) {
         if data == Data([0xD4, 0x05, 0x01]) {
-            guard phase == .handshakeInitiate, let peripheral, let command else { return }
-            phase = .handshakeAck
-            peripheral.writeValue(Data([0x84, 0x00]), for: command, type: .withoutResponse)
+            if let peripheral, let command {
+                if phase == .handshakeInitiate { phase = .handshakeAck }
+                peripheral.writeValue(Data([0x84, 0x00]), for: command, type: .withoutResponse)
+            }
             return
         }
 
         if data == Data([0xD4, 0x00, 0x01]) {
-            guard phase == .handshakeAck else { return }
+            guard phase == .handshakeAck || phase == .handshakeInitiate else { return }
             phase = .handshakeReady
-            scheduleSourceCommandFallback()
+            scheduleHandshakeCommandFallback()
             return
         }
 
         if data == Data([0xD4, 0x00, 0x03]) {
-            guard phase == .handshakeReady || phase == .handshakeAck else { return }
+            guard phase == .handshakeReady || phase == .handshakeAck || phase == .handshakeInitiate else { return }
             phase = .handshakeReady
             sendSourceCommand()
             return
@@ -165,40 +201,20 @@ final class Z407Controller: NSObject, ObservableObject {
         let sourceAck = mode == .mac ? Data([0xC1, 0x01]) : Data([0xC1, 0x02])
         let sourceComplete = mode == .mac ? Data([0xCF, 0x04]) : Data([0xCF, 0x05])
         if data == sourceAck || data == sourceComplete {
-            finishSuccessfully()
+            succeedKeepSession()
         }
     }
 
-    private func finishSuccessfully() {
-        guard phase == .switching else { return }
-        settle?.cancel()
-        settle = nil
-        phase = .disconnecting
-
-        guard let peripheral else {
-            succeedAfterDisconnect()
-            return
-        }
-        if let response, peripheral.state == .connected {
-            peripheral.setNotifyValue(false, for: response)
-        }
-        command = nil
-        response = nil
-        if peripheral.state == .connected || peripheral.state == .connecting {
-            central.cancelPeripheralConnection(peripheral)
-        } else {
-            self.peripheral = nil
-            succeedAfterDisconnect()
-        }
-    }
-
-    private func succeedAfterDisconnect() {
+    private func succeedKeepSession() {
         timeout?.cancel()
         timeout = nil
         settle?.cancel()
         settle = nil
-        awaitingDisconnectToReconnect = false
-        usedScan = false
+        retrieveFallback?.cancel()
+        retrieveFallback = nil
+        droppingRetrieve = false
+        scanning = false
+        central.stopScan()
         phase = .idle
         pendingMode = nil
         continuation?.resume()
@@ -210,9 +226,11 @@ final class Z407Controller: NSObject, ObservableObject {
         timeout = nil
         settle?.cancel()
         settle = nil
+        retrieveFallback?.cancel()
+        retrieveFallback = nil
         central.stopScan()
-        awaitingDisconnectToReconnect = false
-        usedScan = false
+        scanning = false
+        droppingRetrieve = false
         phase = .idle
         pendingMode = nil
         updateStatus("Z407 error: \(error.localizedDescription)")
@@ -225,6 +243,7 @@ final class Z407Controller: NSObject, ObservableObject {
 
     private func disconnectCurrentPeripheral() {
         central.stopScan()
+        scanning = false
         guard let peripheral else {
             command = nil
             response = nil
@@ -238,9 +257,8 @@ final class Z407Controller: NSObject, ObservableObject {
         response = nil
         if peripheral.state == .connected || peripheral.state == .connecting {
             central.cancelPeripheralConnection(peripheral)
-        } else {
-            self.peripheral = nil
         }
+        self.peripheral = nil
     }
 
     private func startTimeout() {
@@ -252,16 +270,16 @@ final class Z407Controller: NSObject, ObservableObject {
 
     private func startSettleTimeout() {
         settle?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.finishSuccessfully() }
+        let work = DispatchWorkItem { [weak self] in self?.succeedKeepSession() }
         settle = work
         queue.asyncAfter(deadline: .now() + 0.4, execute: work)
     }
 
-    private func scheduleSourceCommandFallback() {
+    private func scheduleHandshakeCommandFallback() {
         settle?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.sendSourceCommand() }
         settle = work
-        queue.asyncAfter(deadline: .now() + 0.3, execute: work)
+        queue.asyncAfter(deadline: .now() + 0.8, execute: work)
     }
 
     private func updateStatus(_ value: String) {
@@ -289,20 +307,33 @@ extension Z407Controller: CBCentralManagerDelegate {
             }
             return
         }
-        if central.state != .unknown && central.state != .resetting && continuation != nil && phase != .disconnecting {
+        if central.state != .unknown && central.state != .resetting && continuation != nil {
             fail(Z407Error.bluetoothUnavailable)
         }
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String: Any], rssi RSSI: NSNumber) {
-        guard self.peripheral == nil, phase == .connecting else { return }
+        guard phase == .connecting else { return }
+        if let current = self.peripheral, current.state == .connected || current === peripheral { return }
+        if let current = self.peripheral, current.state != .connected {
+            droppingRetrieve = true
+            central.cancelPeripheralConnection(current)
+        }
         central.stopScan()
+        scanning = false
+        retrieveFallback?.cancel()
+        retrieveFallback = nil
         attachAndConnect(peripheral)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
         guard self.peripheral === peripheral else { return }
+        droppingRetrieve = false
         storedID = peripheral.identifier
+        retrieveFallback?.cancel()
+        retrieveFallback = nil
+        central.stopScan()
+        scanning = false
         updateStatus("Discovering Z407 controls…")
         peripheral.discoverServices([serviceUUID])
     }
@@ -312,30 +343,34 @@ extension Z407Controller: CBCentralManagerDelegate {
         self.peripheral = nil
         command = nil
         response = nil
-        if !usedScan, phase == .connecting {
-            beginScan()
+        if phase == .connecting, continuation != nil {
+            updateStatus("Searching for Z407…")
+            if !scanning { beginScan() }
             return
         }
         fail(error ?? Z407Error.connectionFailed)
     }
 
     func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        guard self.peripheral == nil || self.peripheral === peripheral else { return }
+        let wasCurrent = self.peripheral == nil || self.peripheral === peripheral
+        guard wasCurrent else { return }
+
+        if droppingRetrieve {
+            droppingRetrieve = false
+            if self.peripheral === peripheral {
+                self.peripheral = nil
+                command = nil
+                response = nil
+            }
+            if phase == .connecting, continuation != nil, self.peripheral == nil, !scanning {
+                beginScan()
+            }
+            return
+        }
+
         self.peripheral = nil
         command = nil
         response = nil
-
-        if phase == .disconnecting {
-            succeedAfterDisconnect()
-            return
-        }
-
-        if awaitingDisconnectToReconnect, continuation != nil, pendingMode != nil {
-            awaitingDisconnectToReconnect = false
-            phase = .connecting
-            connectToSpeaker()
-            return
-        }
 
         if continuation != nil {
             fail(error ?? Z407Error.connectionFailed)

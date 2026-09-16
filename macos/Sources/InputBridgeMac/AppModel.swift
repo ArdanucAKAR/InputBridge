@@ -105,10 +105,21 @@ final class AppModel: ObservableObject {
             guard let self else { return }
             guard let offer = selectedOffer else { throw AppError.controllerNotFound }
             status = "Applying \(mode.title) profile…"
-            if z407Enabled { try await z407.switchSource(for: mode) }
+            var z407Note: String?
+            if z407Enabled {
+                do {
+                    try await z407.switchSource(for: mode)
+                } catch {
+                    z407Note = error.localizedDescription
+                }
+            }
             try await controller.apply(mode, offer: offer)
             currentMode = mode
-            status = "\(mode.title) profile applied."
+            if let z407Note {
+                status = "\(mode.title) profile applied. Z407: \(z407Note)"
+            } else {
+                status = "\(mode.title) profile applied."
+            }
         }
     }
 
