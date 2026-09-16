@@ -12,6 +12,7 @@
 *.local.json
 *.p12
 *.mobileprovision
+*.provisionprofile
 
 # Xcode and local macOS build products
 macos/InputBridgeMac.xcodeproj/

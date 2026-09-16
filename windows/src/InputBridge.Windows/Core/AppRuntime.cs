@@ -4,6 +4,7 @@ public sealed class AppRuntime
 {
     private readonly SettingsStore _store = new();
     private readonly DdcMonitorService _ddc = new();
+    private readonly CameraCaptureService _camera = new();
     private readonly SemaphoreSlim _profileGate = new(1, 1);
     private ControllerServer? _server;
     private DiscoveryResponder? _discovery;
@@ -11,6 +12,7 @@ public sealed class AppRuntime
 
     public AppSettings Settings { get; }
     public PairingService PairingService { get; }
+    public CameraCaptureService Camera => _camera;
     public string Status { get; private set; } = "Starting…";
     public event Action? PairingsChanged;
     public event Action? StatusChanged;
@@ -47,6 +49,7 @@ public sealed class AppRuntime
             _server = null;
         }
 
+        await _camera.DisposeAsync();
         _profileGate.Dispose();
     }
 
@@ -82,12 +85,30 @@ public sealed class AppRuntime
         SetStatus("Monitor configuration saved.");
     }
 
+    public async Task<IReadOnlyList<CameraDeviceInfo>> ListCamerasAsync() => await CameraCaptureService.EnumerateAsync();
+
+    public void SaveCameraSettings(bool enabled, string deviceId)
+    {
+        Settings.CameraShareEnabled = enabled;
+        Settings.CameraDeviceId = deviceId;
+        _store.Save(Settings);
+        SetStatus(enabled ? "Camera share enabled." : "Camera share disabled.");
+    }
+
     public async Task<List<MonitorActionResult>> ApplyProfileAsync(ProfileMode profile)
     {
         await _profileGate.WaitAsync();
         try
         {
             SetStatus($"Applying {profile} profile…");
+            try
+            {
+                await ApplyCameraAsync(profile);
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"{profile} profile camera error: {ex.Message}");
+            }
             var result = await Task.Run(() => _ddc.Apply(Settings.Monitors, profile));
             SetStatus(result.All(x => x.Ok)
                 ? $"{profile} profile applied."
@@ -98,6 +119,16 @@ public sealed class AppRuntime
         {
             _profileGate.Release();
         }
+    }
+
+    private async Task ApplyCameraAsync(ProfileMode profile)
+    {
+        if (profile == ProfileMode.Mac && Settings.CameraShareEnabled)
+        {
+            await _camera.StartAsync(Settings.CameraDeviceId);
+            return;
+        }
+        await _camera.StopAsync();
     }
 
     private void SetStatus(string value)

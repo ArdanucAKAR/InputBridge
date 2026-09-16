@@ -3,6 +3,7 @@
 ## Unreleased
 
 - macOS Z407 discovery scans in parallel with reconnect, keeps the control session after a successful handshake, and no longer blocks monitor switching if the speaker is missing.
+- Optional Windows USB camera share publishes 1080p JPEG over the paired local API; a signed macOS Camera Extension appears as InputBridge Camera.
 
 ## 0.2.0
 

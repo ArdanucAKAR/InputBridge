@@ -14,6 +14,7 @@ targets:
     platform: macOS
     sources:
       - path: Sources/InputBridgeMac
+      - path: Sources/Shared
     settings:
       base:
         PRODUCT_NAME: InputBridge
@@ -23,6 +24,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: Resources/InputBridge.entitlements
     dependencies:
       - sdk: SwiftUI.framework
       - sdk: AppKit.framework
@@ -30,6 +32,33 @@ targets:
       - sdk: Security.framework
       - sdk: ServiceManagement.framework
       - sdk: IOBluetooth.framework
+      - sdk: SystemExtensions.framework
+      - target: InputBridgeCamera
+        embed: true
+        codeSign: true
     scheme:
       testTargets: []
       gatherCoverageData: false
+  InputBridgeCamera:
+    type: system-extension
+    platform: macOS
+    sources:
+      - path: Sources/InputBridgeCamera
+      - path: Sources/Shared
+    settings:
+      base:
+        PRODUCT_NAME: InputBridgeCamera
+        PRODUCT_BUNDLE_IDENTIFIER: com.inputbridge.mac.camera
+        INFOPLIST_FILE: Resources/CameraExtension-Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: Resources/CameraExtension.entitlements
+        SKIP_INSTALL: YES
+    dependencies:
+      - sdk: CoreMediaIO.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreVideo.framework
+      - sdk: CoreGraphics.framework
+      - sdk: ImageIO.framework

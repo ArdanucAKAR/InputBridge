@@ -9,4 +9,4 @@ For a security issue, contact the repository maintainer privately with:
 - reproduction steps
 - any suggested mitigation
 
-InputBridge is designed for trusted private networks. Do not expose its controller port directly to the internet.
+InputBridge is designed for trusted private networks. Do not expose its controller port directly to the internet. The optional camera stream uses the same pairing token and private-network checks; do not forward it off the LAN.

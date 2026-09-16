@@ -11,22 +11,27 @@ final class AppModel: ObservableObject {
     @Published var launchAtLogin = UserDefaults.standard.bool(forKey: "launch-at-login")
     @Published var keyboardPattern = UserDefaults.standard.string(forKey: "keyboard-name-pattern") ?? "G915|G913"
     @Published var z407Enabled = UserDefaults.standard.object(forKey: "z407-enabled") as? Bool ?? true
+    @Published var cameraShareEnabled = UserDefaults.standard.object(forKey: "camera-share-enabled") as? Bool ?? true
     @Published var manualHost = UserDefaults.standard.string(forKey: "manual-controller-host") ?? ""
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
 
     let discovery = DiscoveryService()
     let controller = ControllerClient()
     let z407 = Z407Controller()
+    let cameraExtension = CameraExtensionInstaller()
+    private let cameraStream = CameraStreamClient()
     private var monitor: G915Monitor?
 
     init() {
         discovery.start()
         restartKeyboardMonitor()
+        cameraExtension.activate()
     }
 
     deinit {
         discovery.stop()
         monitor?.stop()
+        cameraStream.stop()
     }
 
     var selectedOffer: ControllerOffer? {
@@ -59,6 +64,7 @@ final class AppModel: ObservableObject {
     }
 
     func forget() {
+        cameraStream.stop()
         controller.forget()
         status = "Pairing removed."
     }
@@ -75,6 +81,7 @@ final class AppModel: ObservableObject {
         }
         UserDefaults.standard.set(pattern, forKey: "keyboard-name-pattern")
         UserDefaults.standard.set(z407Enabled, forKey: "z407-enabled")
+        UserDefaults.standard.set(cameraShareEnabled, forKey: "camera-share-enabled")
         restartKeyboardMonitor()
         status = "Device settings saved."
     }
@@ -115,6 +122,7 @@ final class AppModel: ObservableObject {
             }
             try await controller.apply(mode, offer: offer)
             currentMode = mode
+            updateCameraStream(mode, offer: offer)
             if let z407Note {
                 status = "\(mode.title) profile applied. Z407: \(z407Note)"
             } else {
@@ -129,6 +137,14 @@ final class AppModel: ObservableObject {
             Task { @MainActor in await self?.detected(mode) }
         }
         monitor?.start()
+    }
+
+    private func updateCameraStream(_ mode: ProfileMode, offer: ControllerOffer) {
+        if mode == .mac, cameraShareEnabled, let token = controller.pairingToken() {
+            cameraStream.start(url: controller.cameraStreamURL(offer: offer), token: token)
+        } else {
+            cameraStream.stop()
+        }
     }
 
     private func run(_ action: @escaping () async throws -> Void) async {

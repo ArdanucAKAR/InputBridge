@@ -13,6 +13,8 @@ public sealed class AppSettings
     public string DiscoveryMulticastGroup { get; set; } = "239.255.77.77";
     public List<MonitorProfileSetting> Monitors { get; set; } = [];
     public List<TrustedClient> TrustedClients { get; set; } = [];
+    public bool CameraShareEnabled { get; set; }
+    public string CameraDeviceId { get; set; } = "";
 }
 
 public sealed class MonitorProfileSetting

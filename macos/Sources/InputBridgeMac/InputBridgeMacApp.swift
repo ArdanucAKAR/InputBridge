@@ -12,7 +12,7 @@ struct InputBridgeMacApp: App {
 
         Window("InputBridge Setup", id: "setup") {
             SetupView(model: model)
-                .frame(minWidth: 650, minHeight: 500)
+                .frame(minWidth: 650, minHeight: 620)
                 .padding(20)
         }
     }
@@ -123,10 +123,15 @@ struct SetupView: View {
                         Text("Z407 source switch")
                         Toggle("Enable Logitech Z407 adapter", isOn: $model.z407Enabled)
                     }
+                    GridRow {
+                        Text("Windows camera share")
+                        Toggle("Enable InputBridge Camera", isOn: $model.cameraShareEnabled)
+                    }
                 }
                 Text("Connected keyboard → Mac profile. Disconnected keyboard → Windows profile.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                CameraExtensionStatusView(installer: model.cameraExtension)
                 HStack {
                     Button("Save device settings") { model.saveDeviceSettings() }
                     Spacer()
@@ -148,6 +153,22 @@ struct SetupView: View {
             }
 
             Spacer()
+        }
+    }
+}
+
+private struct CameraExtensionStatusView: View {
+    @ObservedObject var installer: CameraExtensionInstaller
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(installer.status)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("After install, choose “InputBridge Camera” once in Zoom, Meet or FaceTime. The camera stays plugged into Windows.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Button("Install camera extension") { installer.activate() }
         }
     }
 }

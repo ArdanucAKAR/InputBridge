@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         RefreshMonitors();
         RefreshPairings();
         RefreshStatus();
+        Loaded += async (_, _) => await RefreshCamerasAsync();
     }
 
     private void RefreshStatus()
@@ -56,6 +57,33 @@ public partial class MainWindow : Window
     }
 
     private void RefreshMonitors_Click(object sender, RoutedEventArgs e) => RefreshMonitors();
+
+    private async void RefreshCameras_Click(object sender, RoutedEventArgs e) => await RefreshCamerasAsync();
+
+    private async Task RefreshCamerasAsync()
+    {
+        try
+        {
+            var cameras = await _runtime.ListCamerasAsync();
+            CameraList.ItemsSource = cameras;
+            CameraShareEnabled.IsChecked = _runtime.Settings.CameraShareEnabled;
+            var selected = _runtime.Settings.CameraDeviceId;
+            if (string.IsNullOrWhiteSpace(selected)) selected = CameraCaptureService.PreferredDeviceId(cameras);
+            CameraList.SelectedValue = cameras.Any(item => item.Id == selected) ? selected : cameras.FirstOrDefault()?.Id;
+        }
+        catch (Exception ex)
+        {
+            WpfMessageBox.Show(ex.Message, "InputBridge", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void SaveCamera_Click(object sender, RoutedEventArgs e)
+    {
+        var id = CameraList.SelectedValue as string ?? "";
+        _runtime.SaveCameraSettings(CameraShareEnabled.IsChecked == true, id);
+        RefreshStatus();
+        WpfMessageBox.Show("Camera setup saved. Apply the Mac profile to start sharing.", "InputBridge");
+    }
 
     private void SaveMonitors_Click(object sender, RoutedEventArgs e)
     {

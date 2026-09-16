@@ -8,13 +8,15 @@ InputBridge, bir Windows bilgisayarı ile bir Mac arasında tek tuş hissi veren
 - Klavye Mac'e bağlanınca Mac profiline geçer:
   - Mac'te Logitech Z407 kaynağını Bluetooth yapar.
   - Windows'ta seçtiğin monitörleri Mac girişlerine geçirir.
+  - İsteğe bağlı: Windows'taki USB kamerayı Mac'te **InputBridge Camera** olarak paylaşır (1080p, mikrofon yok).
 - Klavye LIGHTSPEED'e döndüğünde Windows profiline geçer:
   - Z407 kaynağını AUX yapar.
   - Monitörleri Windows girişlerine geçirir.
+  - Kamera yayını durur; Brio yine Windows uygulamalarına kalır.
 
 Uygulama sabit IP, Terminal, PowerShell, Python veya elle token kopyalama istemez.
 
-> Bu sürümün desteklediği cihaz adapter'ları: **G915/G913 Bluetooth trigger**, **Z407 BLE source switch**, **DDC/CI monitor input switch**. Başka cihazlar için adapter eklenmesi gerekir.
+> Bu sürümün desteklediği cihaz adapter'ları: **G915/G913 Bluetooth trigger**, **Z407 BLE source switch**, **DDC/CI monitor input switch**, **Windows USB kamera → Mac sanal kamera**. Sanal kamera imzalı Mac build ve bir kez Sistem Ayarları izni ister.
 
 ## Nasıl çalışır?
 
@@ -23,6 +25,7 @@ Windows Controller                  macOS Companion
 ──────────────────                  ───────────────
 DDC/CI ile monitör girişleri        G915 Bluetooth bağlantısı
 Yerel ağ discovery cevabı            Z407 BLE source komutları
+USB kamera yayını (eşleşmiş)         InputBridge Camera uzantısı
 Pairing onayı                       Otomatik controller keşfi
 Tray uygulaması                     Menü çubuğu uygulaması
 ```
@@ -41,7 +44,8 @@ Mac uygulaması Windows Controller'ı multicast discovery ile bulur. Windows'un 
 5. Mac uygulamasını aç, otomatik bulunan Windows Controller için **Pair** düğmesine bas.
 6. Windows uygulamasında pairing isteğini onayla.
 7. Mac uygulamasında Bluetooth izni ver; Z407 ve G915/G913 bağlı/pair edilmiş olsun.
-8. İki uygulamada da otomatik başlatmayı aç.
+8. Kamerayı paylaşmak için Windows **Camera** sekmesinde share’i aç, Brio’yu seç, kaydet. Mac Setup’ta **Install camera extension** ile Sistem Ayarları’nda izin ver; Zoom/Meet’te bir kez **InputBridge Camera** seç.
+9. İki uygulamada da otomatik başlatmayı aç.
 
 ## Güvenlik modeli
 
@@ -97,6 +101,7 @@ macOS DMG, Apple Developer ID ile imzalanıp notarize edilmezse Gatekeeper uyar�
 - Bazı monitörlerde VRR/G-SYNC açıkken input değişimi çalışmaz.
 - Multicast discovery misafir Wi‑Fi, AP/client isolation veya bazı kurumsal VLAN'larda engellenebilir.
 - Z407 adapter'ı Logitech tarafından yayımlanmış resmi SDK'ya değil, doğrulanmış tersine mühendislik GATT komutlarına dayanır.
+- InputBridge Camera imzalı Mac build ve Sistem Ayarları izni ister. Unsigned DMG'de sanal kamera yüklenmez. Zoom/Meet kamerayı otomatik seçmez; bir kez **InputBridge Camera** seç.
 
 ## Lisans
 

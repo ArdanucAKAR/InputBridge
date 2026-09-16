@@ -43,4 +43,32 @@ Authorization: Bearer <pairing-token>
 Content-Type: application/json
 ```
 
-The Windows controller applies configured monitor actions. The Mac companion applies local BLE actions before it calls this endpoint.
+The Windows controller applies configured monitor actions and, when camera share is enabled, starts or stops the USB camera publisher. The Mac companion applies local BLE actions before it calls this endpoint.
+
+## Camera share
+
+`GET /api/camera/status`
+
+```http
+Authorization: Bearer <pairing-token>
+```
+
+```json
+{"ok":true,"enabled":true,"streaming":true,"deviceName":"Logi Brio"}
+```
+
+`GET /api/camera/stream`
+
+```http
+Authorization: Bearer <pairing-token>
+```
+
+Private-network only. Returns `503` when share is disabled or the Mac profile has not started capture.
+
+Body is an `application/octet-stream` of length-prefixed JPEG frames (`X-InputBridge-Camera: jpeg-framed-v1`):
+
+```
+uint32 big-endian length | JPEG bytes | uint32 length | JPEG bytes | ...
+```
+
+Applying `mac` starts capture of the configured Windows USB camera at 1080p. Applying `windows` stops capture so local Windows apps can use the camera again.

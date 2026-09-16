@@ -43,6 +43,30 @@
           </StackPanel>
         </Grid>
       </TabItem>
+      <TabItem Header="Camera">
+        <Grid Margin="12">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <TextBlock TextWrapping="Wrap" Text="Share a USB camera attached to this PC with the paired Mac over the local network. The camera stays plugged into Windows. Enable this, pick the Brio, then apply the Mac profile."/>
+          <CheckBox x:Name="CameraShareEnabled" Grid.Row="1" Margin="0,14,0,8" Content="Enable camera share to Mac"/>
+          <Grid Grid.Row="2" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Camera" VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <ComboBox x:Name="CameraList" Grid.Column="1" DisplayMemberPath="Name" SelectedValuePath="Id"/>
+          </Grid>
+          <StackPanel Grid.Row="3" Orientation="Horizontal" VerticalAlignment="Top">
+            <Button Padding="10,5" Margin="0,0,8,0" Click="RefreshCameras_Click">Refresh cameras</Button>
+            <Button Padding="10,5" Click="SaveCamera_Click">Save camera setup</Button>
+          </StackPanel>
+        </Grid>
+      </TabItem>
       <TabItem Header="Pairing">
         <Grid Margin="12">
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>

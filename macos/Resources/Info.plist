@@ -13,6 +13,7 @@
   <key>LSUIElement</key><true/>
   <key>NSBluetoothAlwaysUsageDescription</key><string>InputBridge uses Bluetooth to detect configured keyboards and switch configured BLE accessories.</string>
   <key>NSLocalNetworkUsageDescription</key><string>InputBridge discovers and communicates with its paired Windows controller on your local network.</string>
+  <key>NSSystemExtensionUsageDescription</key><string>InputBridge installs a virtual camera so a USB webcam attached to the paired Windows PC can appear in Zoom, Meet and FaceTime.</string>
   <key>NSAppTransportSecurity</key>
   <dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict>

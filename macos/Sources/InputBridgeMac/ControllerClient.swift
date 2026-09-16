@@ -88,6 +88,12 @@ final class ControllerClient {
         defaults.removeObject(forKey: controllerKey)
     }
 
+    func pairingToken() -> String? { keychain.read(tokenAccount) }
+
+    func cameraStreamURL(offer: ControllerOffer) -> URL {
+        offer.baseURL.appendingPathComponent("api/camera/stream")
+    }
+
     func apply(_ mode: ProfileMode, offer: ControllerOffer) async throws {
         guard let token = keychain.read(tokenAccount) else { throw ClientError.notPaired }
         var request = URLRequest(url: offer.baseURL.appendingPathComponent("api/mode/\(mode.rawValue)"))

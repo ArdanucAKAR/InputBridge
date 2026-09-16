@@ -50,7 +50,27 @@ Apple dağıtımı için GitHub Secrets'a şunları ekle:
 - `APPLE_TEAM_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
 
-Sonra `macos/scripts/package-macos.sh` scriptini signing/notarization parametreleriyle genişlet. Unsigned DMG yalnızca test dağıtımı için uygundur.
+Sonra `macos/scripts/package-macos.sh` scriptini signing/notarization parametreleriyle genişlet. Unsigned DMG hoparlör ve monitör için test dağıtımıdır; **InputBridge Camera uzantısı imzasız build'de yüklenmez**.
+
+### Camera Extension imzalama
+
+Sanal kamera için host app (`com.inputbridge.mac`) ve uzantı (`com.inputbridge.mac.camera`) **aynı Apple team** ile imzalanmalıdır. App ID'lerde System Extension + App Group `group.com.inputbridge.mac` aç.
+
+GitHub'a **asla** koyma:
+
+- `.p12` / Developer ID sertifikası ve şifresi
+- `APPLE_ID`, app-specific password
+- `.mobileprovision` / `.provisionprofile`
+
+Bunları yalnızca GitHub Actions Secrets olarak tut:
+
+- `MACOS_CERTIFICATE_BASE64`
+- `MACOS_CERTIFICATE_PASSWORD`
+- `APPLE_ID`
+- `APPLE_TEAM_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+
+Yerel Xcode'da team'i Signing & Capabilities'den seç; `project.yml` içindeki `DEVELOPMENT_TEAM: ""` boş kalsın. Team ID imzalı uygulamada zaten görünür, yine de git'e yazmak zorunda değilsin.
 
 ## Release öncesi zorunlu test
 
@@ -61,4 +81,6 @@ Sonra `macos/scripts/package-macos.sh` scriptini signing/notarization parametrel
 - [ ] Pairing onayı Windows UI'da çıkıyor.
 - [ ] G915 Bluetooth ↔ LIGHTSPEED geçişi üç kez arka arkaya doğru çalışıyor.
 - [ ] Z407 AUX ↔ Bluetooth geçişi test edildi.
+- [ ] İmzalı Mac build'de InputBridge Camera Sistem Ayarları'nda izinleniyor ve Zoom/Meet listesinde görünüyor.
+- [ ] Mac profilinde Windows Brio görüntüsü Mac sanal kameraya geliyor; Windows profilinde kamera yine yerel Windows'a dönüyor.
 - [ ] Mac login item ve Windows startup davranışı test edildi.
