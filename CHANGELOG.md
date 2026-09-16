@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- macOS Z407 adapter completes the BLE handshake, switches source, then disconnects so the speaker is not left in a stuck remote session across profile changes.
+
 ## 0.2.0
 
 - GitHub release workflow and release documentation added.
