@@ -78,6 +78,8 @@ if [[ "$SIGNED" == true ]]; then
     INPUTBRIDGE_APP_PROFILE="$MACOS_APP_PROFILE"
     INPUTBRIDGE_CAMERA_PROFILE="$MACOS_CAMERA_PROFILE"
     OTHER_CODE_SIGN_FLAGS="--timestamp"
+    # `xcodebuild build` otherwise adds com.apple.security.get-task-allow, which notarization rejects.
+    CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
   )
 else
   BUILD_SETTINGS+=(CODE_SIGNING_ALLOWED=NO)
