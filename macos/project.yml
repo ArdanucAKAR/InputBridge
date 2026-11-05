@@ -60,7 +60,9 @@ targets:
       - path: Sources/Shared
     settings:
       base:
-        PRODUCT_NAME: InputBridgeCamera
+        # sysextd looks the extension up as Contents/Library/SystemExtensions/<bundle ID>.systemextension,
+        # so the product must be named after the bundle identifier.
+        PRODUCT_NAME: com.inputbridge.mac.camera
         PRODUCT_BUNDLE_IDENTIFIER: com.inputbridge.mac.camera
         INFOPLIST_FILE: Resources/CameraExtension-Info.plist
         GENERATE_INFOPLIST_FILE: NO
