@@ -12,7 +12,7 @@ struct InputBridgeMacApp: App {
 
         Window("InputBridge Setup", id: "setup") {
             SetupView(model: model)
-                .frame(minWidth: 650, minHeight: 620)
+                .frame(minWidth: 650, minHeight: 760)
                 .padding(20)
         }
     }
@@ -43,6 +43,7 @@ private struct MenuBarContent: View {
             Button("Apply Mac profile") { Task { await model.apply(.mac) } }
                 .disabled(model.busy)
             Divider()
+            UpdateMenuItem(updates: model.updates)
             Button("Open setup…") {
                 NSApp.activate(ignoringOtherApps: true)
                 openWindow(id: "setup")
@@ -141,6 +142,8 @@ struct SetupView: View {
                 }
             }
 
+            UpdateSettingsView(updates: model.updates)
+
             GroupBox("Test profiles") {
                 HStack {
                     Button("Test Windows profile") { Task { await model.apply(.windows) } }
@@ -153,6 +156,51 @@ struct SetupView: View {
             }
 
             Spacer()
+        }
+    }
+}
+
+private struct UpdateMenuItem: View {
+    @ObservedObject var updates: UpdateManager
+
+    var body: some View {
+        if updates.state == .readyToInstall, let release = updates.latest {
+            Button("Install update \(release.version) and restart") { updates.install() }
+        } else {
+            Button(updates.isBusy ? "Checking for updates…" : "Check for updates") {
+                Task { await updates.check(userInitiated: true) }
+            }
+            .disabled(updates.isBusy)
+        }
+    }
+}
+
+private struct UpdateSettingsView: View {
+    @ObservedObject var updates: UpdateManager
+
+    var body: some View {
+        GroupBox("Updates") {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(updates.isDevelopmentBuild ? "Installed version: development build" : "Installed version: \(updates.currentVersion)")
+                    .fontWeight(.medium)
+                Text(updates.status)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle("Check GitHub for updates automatically (every 6 hours)", isOn: $updates.autoCheck)
+                Toggle("Install updates automatically", isOn: $updates.autoInstall)
+                HStack {
+                    Button("Check now") { Task { await updates.check(userInitiated: true) } }
+                        .disabled(updates.isBusy)
+                    Button("Install and restart") { updates.install() }
+                        .disabled(updates.state != .readyToInstall)
+                    if let page = updates.latest?.pageURL {
+                        Button("Release notes") { NSWorkspace.shared.open(page) }
+                    }
+                    Spacer()
+                }
+            }
+            .padding(6)
         }
     }
 }

@@ -95,6 +95,15 @@ Tag push edildiğinde workflow release asset'lerini oluşturur:
 
 macOS DMG, Apple Developer ID ile imzalanıp notarize edilmezse Gatekeeper uyarısı gösterebilir. Yayın dağıtımında `docs/RELEASING_TR.md` içindeki signing/notarization adımlarını uygula.
 
+## Otomatik güncelleme
+
+İki uygulama da açıldıktan 45 saniye sonra ve her 6 saatte bir GitHub'daki son yayınlanmış release'i kontrol eder. Yeni sürüm varsa installer arka planda indirilir ve GitHub'ın asset için verdiği SHA-256 değeriyle doğrulanır.
+
+- **Windows:** Tray menüsünde ve *Updates* sekmesinde *Install and restart* çıkar. Installer sessiz kurulur (bir kez UAC onayı ister), ardından InputBridge arka planda yeniden açılır.
+- **macOS:** Menü çubuğunda ve kurulum penceresinde *Install update and restart* çıkar. Uygulama kapanır, yardımcı script `.app` paketini yerinde değiştirir ve uygulamayı yeniden açar. Uygulama yazılabilir bir klasörde değilse (örneğin DMG içinden çalışıyorsa) DMG açılır, sürükle-bırak ile güncellersin.
+
+Otomatik kurulum iki uygulamada da isteğe bağlıdır; otomatik kontrol kapatılabilir. Draft ve pre-release'ler yok sayılır. Yerel geliştirme build'leri `0.0.0` sürümünü raporlar ve otomatik kontrol yapmaz.
+
 ## Bilinen sınırlar
 
 - DDC/CI, monitör/port/VRR kombinasyonuna bağlıdır. Kurulum ekranındaki test butonlarıyla önce doğrula.

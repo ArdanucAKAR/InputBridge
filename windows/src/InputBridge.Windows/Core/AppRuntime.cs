@@ -13,6 +13,7 @@ public sealed class AppRuntime
     public AppSettings Settings { get; }
     public PairingService PairingService { get; }
     public CameraCaptureService Camera => _camera;
+    public UpdateService Updates { get; }
     public string Status { get; private set; } = "Starting…";
     public event Action? PairingsChanged;
     public event Action? StatusChanged;
@@ -22,6 +23,7 @@ public sealed class AppRuntime
         Settings = _store.Load();
         PairingService = new PairingService(Settings, _store);
         PairingService.Changed += () => PairingsChanged?.Invoke();
+        Updates = new UpdateService(Settings);
     }
 
     public async Task StartAsync()
@@ -30,12 +32,22 @@ public sealed class AppRuntime
         _discovery = new DiscoveryResponder(Settings);
         await _server.StartAsync();
         await _discovery.StartAsync();
+        Updates.Start();
         SetStatus($"Ready. Waiting for paired Macs on HTTP {Settings.HttpPort}.");
+    }
+
+    public void SaveUpdateSettings(bool autoCheck, bool autoInstall)
+    {
+        Settings.AutoCheckUpdates = autoCheck;
+        Settings.AutoInstallUpdates = autoInstall;
+        _store.Save(Settings);
     }
 
     public async Task StopAsync()
     {
         if (System.Threading.Interlocked.Exchange(ref _stopped, 1) != 0) return;
+
+        Updates.Dispose();
 
         if (_discovery is not null)
         {

@@ -84,6 +84,20 @@
           </StackPanel>
         </Grid>
       </TabItem>
+      <TabItem Header="Updates">
+        <StackPanel Margin="12">
+          <TextBlock TextWrapping="Wrap" Text="InputBridge checks GitHub Releases for new versions, downloads the Windows installer in the background and verifies its SHA-256 digest before installing."/>
+          <TextBlock x:Name="CurrentVersionText" Margin="0,14,0,0" FontWeight="SemiBold"/>
+          <TextBlock x:Name="UpdateStatusText" Margin="0,6,0,0" Foreground="#456" TextWrapping="Wrap"/>
+          <CheckBox x:Name="AutoCheckUpdates" Margin="0,16,0,6" Content="Check for updates automatically (every 6 hours)" Click="UpdateSettings_Click"/>
+          <CheckBox x:Name="AutoInstallUpdates" Margin="0,0,0,14" Content="Install updates automatically (Windows asks for administrator approval)" Click="UpdateSettings_Click"/>
+          <StackPanel Orientation="Horizontal">
+            <Button x:Name="CheckUpdatesButton" Padding="10,5" Margin="0,0,8,0" Click="CheckUpdates_Click">Check now</Button>
+            <Button x:Name="InstallUpdateButton" Padding="10,5" Margin="0,0,8,0" Click="InstallUpdate_Click" IsEnabled="False">Install and restart</Button>
+            <Button x:Name="ReleaseNotesButton" Padding="10,5" Click="ReleaseNotes_Click" IsEnabled="False">Release notes</Button>
+          </StackPanel>
+        </StackPanel>
+      </TabItem>
       <TabItem Header="About">
         <StackPanel Margin="16">
           <TextBlock FontSize="16" FontWeight="SemiBold" Text="InputBridge local controller"/>

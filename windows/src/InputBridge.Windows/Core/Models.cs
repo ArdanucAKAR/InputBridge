@@ -15,6 +15,8 @@ public sealed class AppSettings
     public List<TrustedClient> TrustedClients { get; set; } = [];
     public bool CameraShareEnabled { get; set; }
     public string CameraDeviceId { get; set; } = "";
+    public bool AutoCheckUpdates { get; set; } = true;
+    public bool AutoInstallUpdates { get; set; }
 }
 
 public sealed class MonitorProfileSetting

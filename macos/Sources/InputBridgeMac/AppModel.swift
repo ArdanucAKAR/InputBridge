@@ -19,6 +19,7 @@ final class AppModel: ObservableObject {
     let controller = ControllerClient()
     let z407 = Z407Controller()
     let cameraExtension = CameraExtensionInstaller()
+    let updates = UpdateManager()
     private let cameraStream = CameraStreamClient()
     private var monitor: G915Monitor?
 
@@ -26,6 +27,7 @@ final class AppModel: ObservableObject {
         discovery.start()
         restartKeyboardMonitor()
         cameraExtension.activate()
+        updates.start()
     }
 
     deinit {

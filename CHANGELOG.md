@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Windows and macOS apps check GitHub Releases for new versions, download the installer in the background, verify its SHA-256 digest and install it on request (or automatically when enabled).
+- Windows installer restarts InputBridge after silent (in-app) updates and no longer duplicates firewall rules on reinstall.
+
 - macOS Z407 discovery scans in parallel with reconnect, keeps the control session after a successful handshake, and no longer blocks monitor switching if the speaker is missing.
 - Optional Windows USB camera share publishes 1080p JPEG over the paired local API; a signed macOS Camera Extension appears as InputBridge Camera.
 

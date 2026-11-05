@@ -8,6 +8,9 @@ settings:
     SWIFT_VERSION: "5.9"
     SWIFT_STRICT_CONCURRENCY: minimal
     MACOSX_DEPLOYMENT_TARGET: "13.0"
+    # Release builds override these from the git tag; 0.0.0 marks a local development build.
+    MARKETING_VERSION: "0.0.0"
+    CURRENT_PROJECT_VERSION: "1"
 targets:
   InputBridgeMac:
     type: application
@@ -33,6 +36,7 @@ targets:
       - sdk: ServiceManagement.framework
       - sdk: IOBluetooth.framework
       - sdk: SystemExtensions.framework
+      - sdk: CryptoKit.framework
       - target: InputBridgeCamera
         embed: true
         codeSign: true

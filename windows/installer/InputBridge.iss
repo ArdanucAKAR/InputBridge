@@ -19,6 +19,8 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 DisableProgramGroupPage=yes
 WizardStyle=modern
+CloseApplications=yes
+RestartApplications=no
 
 [Files]
 Source: "..\dist\publish\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion
@@ -35,9 +37,14 @@ Name: "autostart"; Description: "Start InputBridge when I sign in"; GroupDescrip
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "InputBridge"; ValueData: """{app}\{#MyAppExeName}"" --background"; Tasks: autostart; Flags: uninsdeletevalue
 
 [Run]
+; Remove rules from a previous install first so automatic updates do not pile up duplicate rules.
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""InputBridge Controller TCP"""; Flags: runhidden
+Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""InputBridge Discovery UDP"""; Flags: runhidden
 Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""InputBridge Controller TCP"" dir=in action=allow protocol=TCP localport=41715 profile=private"; Flags: runhidden
 Filename: "netsh"; Parameters: "advfirewall firewall add rule name=""InputBridge Discovery UDP"" dir=in action=allow protocol=UDP localport=41716 profile=private"; Flags: runhidden
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch InputBridge"; Flags: nowait postinstall skipifsilent
+; Silent installs come from the in-app updater: restart the tray app as the signed-in user.
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--background"; Flags: nowait runasoriginaluser; Check: WizardSilent
 
 [UninstallRun]
 Filename: "netsh"; Parameters: "advfirewall firewall delete rule name=""InputBridge Controller TCP"""; Flags: runhidden

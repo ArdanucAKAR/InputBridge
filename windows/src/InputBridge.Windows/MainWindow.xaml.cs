@@ -19,6 +19,10 @@ public partial class MainWindow : Window
         PairingGrid.ItemsSource = _pairings;
         _runtime.PairingsChanged += RefreshPairings;
         _runtime.StatusChanged += RefreshStatus;
+        _runtime.Updates.Changed += RefreshUpdates;
+        AutoCheckUpdates.IsChecked = _runtime.Settings.AutoCheckUpdates;
+        AutoInstallUpdates.IsChecked = _runtime.Settings.AutoInstallUpdates;
+        RefreshUpdates();
         RefreshMonitors();
         RefreshPairings();
         RefreshStatus();
@@ -108,6 +112,42 @@ public partial class MainWindow : Window
         if (PairingGrid.SelectedItem is not PendingPairingView selected) return;
         _runtime.PairingService.Reject(selected.RequestId);
         RefreshPairings();
+    }
+
+    private void RefreshUpdates()
+    {
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(RefreshUpdates); return; }
+        var updates = _runtime.Updates;
+        CurrentVersionText.Text = updates.IsDevelopmentBuild
+            ? "Installed version: development build"
+            : $"Installed version: {updates.CurrentVersion.ToString(3)}";
+        UpdateStatusText.Text = updates.StatusText;
+        var busy = updates.State is UpdateState.Checking or UpdateState.Downloading or UpdateState.Installing;
+        CheckUpdatesButton.IsEnabled = !busy;
+        InstallUpdateButton.IsEnabled = updates.State == UpdateState.ReadyToInstall;
+        ReleaseNotesButton.IsEnabled = !string.IsNullOrEmpty(updates.Latest?.HtmlUrl);
+    }
+
+    private void UpdateSettings_Click(object sender, RoutedEventArgs e)
+    {
+        _runtime.SaveUpdateSettings(AutoCheckUpdates.IsChecked == true, AutoInstallUpdates.IsChecked == true);
+    }
+
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        await _runtime.Updates.CheckAsync(userInitiated: true);
+    }
+
+    private void InstallUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        _runtime.Updates.TryInstall();
+    }
+
+    private void ReleaseNotes_Click(object sender, RoutedEventArgs e)
+    {
+        if (_runtime.Updates.Latest?.HtmlUrl is not { Length: > 0 } url) return;
+        if (!url.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase)) return;
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
     }
 
     protected override void OnClosing(CancelEventArgs e)

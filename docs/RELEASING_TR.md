@@ -31,6 +31,17 @@ git push origin v0.2.0
 
 GitHub Actions workflow'u Windows installer ve unsigned macOS DMG üretir; tag release sayfasına ekler.
 
+## Uygulama içi otomatik güncelleme
+
+Kurulu uygulamalar `releases/latest` uç noktasını okur. Bir release'in kullanıcılara otomatik ulaşması için:
+
+- Tag `vX.Y.Z` biçiminde olmalı ve bir önceki sürümden büyük olmalı (`v0.2.10` > `v0.2.9`).
+- Release **draft veya pre-release olmamalı**. Test sürümlerini pre-release işaretlersen kullanıcılara gitmez.
+- Asset adları değişmemeli: `InputBridge-Windows-Setup.exe` ve `InputBridge-macOS.dmg`.
+- Uygulama indirilen dosyayı GitHub'ın asset için verdiği SHA-256 digest ile doğrular. Asset'i sonradan yeniden yüklemek (`gh release upload --clobber`) sorun değildir; GitHub yeni digest üretir.
+
+Uygulamalar 45 saniye sonra ve her 6 saatte bir kontrol eder; anında denemek için Windows'ta tray → *Check for updates*, Mac'te menü → *Check for updates*.
+
 ## Windows code signing
 
 Windows SmartScreen uyarısını azaltmak için imzalama sertifikasını GitHub Secrets'a ekle:

@@ -68,6 +68,15 @@ git push origin v0.2.0
 
 Unsigned macOS builds are intended for testing. Public macOS distribution should use Developer ID signing and notarization.
 
+### Automatic updates
+
+Both apps check `https://api.github.com/repos/ArdanucAKAR/InputBridge/releases/latest` 45 seconds after launch and every 6 hours. When the published release is newer than the running version, the app downloads its installer in the background and checks it against the SHA-256 digest that GitHub reports for the asset:
+
+- **Windows** — the tray menu and *Updates* tab offer *Install and restart*. The Inno Setup installer runs silently (one UAC prompt), then relaunches InputBridge in the background.
+- **macOS** — the menu bar and setup window offer *Install update and restart*. InputBridge quits, a helper swaps the app bundle in place and relaunches it. If the app is not in a writable folder (for example, it runs from the DMG), the DMG opens for a manual drag-and-drop.
+
+Automatic install is opt-in in both apps; automatic checking can be turned off. Drafts and pre-releases are ignored. Local development builds report version `0.0.0` and skip automatic checks. The updater relies on the asset names `InputBridge-Windows-Setup.exe` and `InputBridge-macOS.dmg`, so keep them unchanged.
+
 ## Security
 
 InputBridge is intended for a trusted private network. Do not expose the Windows controller port to the public internet. See [SECURITY.md](SECURITY.md).
