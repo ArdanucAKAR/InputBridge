@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.6
 
 - New InputBridge app icon on Windows (exe, installer, window, tray) and macOS (app icon, menu bar).
 - Redesigned Windows controller window: sidebar navigation, card layout, toggle switches and an update banner.
