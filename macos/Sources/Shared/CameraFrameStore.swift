@@ -1,15 +1,15 @@
 import Foundation
 
+/// Hands camera frames from the app to the camera extension through files.
+///
+/// The extension runs as the `_cmiodalassistants` user, so an app group container would resolve to a
+/// different directory in each process. Both sides use a fixed directory in /tmp instead: the app (the
+/// logged-in user) writes, the sandboxed extension reads it through a temporary-exception entitlement.
 enum CameraFrameStore {
-    static let appGroup = "group.com.inputbridge.mac"
+    static let directoryPath = "/tmp/com.inputbridge.camera"
 
     static func directory() -> URL {
-        if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
-            return url
-        }
-        let fallback = URL(fileURLWithPath: "/tmp/com.inputbridge.camera", isDirectory: true)
-        try? FileManager.default.createDirectory(at: fallback, withIntermediateDirectories: true)
-        return fallback
+        URL(fileURLWithPath: directoryPath, isDirectory: true)
     }
 
     static func write(jpeg: Data) throws {
@@ -21,6 +21,14 @@ enum CameraFrameStore {
         _ = try FileManager.default.replaceItemAt(dest, withItemAt: tmp)
         let seq = "\(UInt64(Date().timeIntervalSince1970 * 1000))\n"
         try seq.write(to: dir.appendingPathComponent("frame.seq"), atomically: true, encoding: .utf8)
+    }
+
+    /// Removes the last frame so the extension shows black instead of a frozen picture.
+    static func clear() {
+        let dir = directory()
+        for name in ["frame.seq", "frame.jpg"] {
+            try? FileManager.default.removeItem(at: dir.appendingPathComponent(name))
+        }
     }
 
     static func read() -> (seq: String, jpeg: Data)? {

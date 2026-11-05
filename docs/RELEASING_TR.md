@@ -55,35 +55,50 @@ Bu açık kaynak deposunda sertifikayı veya private key'i asla commit etme.
 
 ## macOS signing ve notarization
 
-Apple dağıtımı için GitHub Secrets'a şunları ekle:
+Secret'lar GitHub Actions Secrets içinde şifreli durur; repo public olsa da görünmez, loglarda maskelenir ve fork'lardan gelen PR'lara verilmez. Secret'lar tanımlı değilse workflow eskisi gibi ad-hoc imzalı (test amaçlı) DMG üretir.
 
-- `MACOS_CERTIFICATE_BASE64`
-- `MACOS_CERTIFICATE_PASSWORD`
-- `APPLE_ID`
-- `APPLE_TEAM_ID`
-- `APPLE_APP_SPECIFIC_PASSWORD`
+İmzasız build'de **InputBridge Camera uzantısı yüklenmez**; sanal kamera için Developer ID imzası gerekir. İndirilen DMG'nin Gatekeeper uyarısı olmadan açılması için ayrıca notarization gerekir.
 
-Sonra `macos/scripts/package-macos.sh` scriptini signing/notarization parametreleriyle genişlet. Unsigned DMG hoparlör ve monitör için test dağıtımıdır; **InputBridge Camera uzantısı imzasız build'de yüklenmez**.
+### 1. Apple Developer hesabında bir kez yapılacaklar
 
-### Camera Extension imzalama
+1. **Certificates** → **Developer ID Application** sertifikası oluştur. Keychain Access'te sertifikayı private key'iyle birlikte `.p12` olarak dışa aktar ve bir şifre ver.
+2. **Identifiers** → iki App ID oluştur:
+   - `com.inputbridge.mac`: **System Extension** yeteneği açık.
+   - `com.inputbridge.mac.camera`: **App Groups** açık, grup `TEAMID.com.inputbridge.mac.camera` (macOS'ta Team ID önekli gruplar Developer ID ile çalışır).
+3. **Profiles** → her App ID için **Developer ID** türünde bir provisioning profile oluştur ve indir.
+4. [App Store Connect](https://appstoreconnect.apple.com/access/integrations/api) → **Integrations** → **Team Keys** → **Developer** rolüyle bir API anahtarı oluştur. `.p8` dosyasını indir (yalnızca bir kez indirilebilir), Key ID ve Issuer ID'yi not et.
 
-Sanal kamera için host app (`com.inputbridge.mac`) ve uzantı (`com.inputbridge.mac.camera`) **aynı Apple team** ile imzalanmalıdır. App ID'lerde System Extension + App Group `group.com.inputbridge.mac` aç.
+### 2. GitHub'a eklenecekler
 
-GitHub'a **asla** koyma:
+**Settings → Secrets and variables → Actions**:
 
-- `.p12` / Developer ID sertifikası ve şifresi
-- `APPLE_ID`, app-specific password
-- `.mobileprovision` / `.provisionprofile`
+| Tür | Ad | Değer |
+|---|---|---|
+| Variable | `MACOS_TEAM_ID` | 10 karakterlik Team ID (gizli değildir) |
+| Secret | `MACOS_CERTIFICATE_P12` | `base64 -i DeveloperID.p12 \| pbcopy` çıktısı |
+| Secret | `MACOS_CERTIFICATE_PASSWORD` | `.p12` şifresi |
+| Secret | `MACOS_APP_PROFILE` | `base64 -i InputBridge.provisionprofile \| pbcopy` |
+| Secret | `MACOS_CAMERA_PROFILE` | `base64 -i InputBridgeCamera.provisionprofile \| pbcopy` |
+| Secret | `NOTARY_KEY_P8` | `.p8` dosyasının metni olduğu gibi (`-----BEGIN PRIVATE KEY-----` dahil) |
+| Secret | `NOTARY_KEY_ID` | API anahtarının Key ID'si |
+| Secret | `NOTARY_ISSUER_ID` | Issuer ID |
 
-Bunları yalnızca GitHub Actions Secrets olarak tut:
+Bu dosyaları (`.p12`, `.p8`, `.provisionprofile`) repoya **asla** commit etme; `.gitignore` ilk üçünü zaten dışarıda tutar, `.p8`'i diskte repo dışında sakla. Sertifika sızarsa Apple Developer portalından hemen iptal et.
 
-- `MACOS_CERTIFICATE_BASE64`
-- `MACOS_CERTIFICATE_PASSWORD`
-- `APPLE_ID`
-- `APPLE_TEAM_ID`
-- `APPLE_APP_SPECIFIC_PASSWORD`
+Workflow sertifikayı geçici bir keychain'e yükler, uygulamayı ve uzantıyı hardened runtime ile imzalar, DMG'yi imzalar, `notarytool` ile Apple'a gönderir, onaylanınca ticket'ı DMG'ye `stapler` ile ekler ve iş bitince keychain'i siler.
 
-Yerel Xcode'da team'i Signing & Capabilities'den seç; `project.yml` içindeki `DEVELOPMENT_TEAM: ""` boş kalsın. Team ID imzalı uygulamada zaten görünür, yine de git'e yazmak zorunda değilsin.
+### Yerelde imzalı build
+
+```bash
+export MACOS_TEAM_ID=TEAMID
+export MACOS_APP_PROFILE="InputBridge Developer ID"        # profil adı veya UUID
+export MACOS_CAMERA_PROFILE="InputBridge Camera Developer ID"
+xcrun notarytool store-credentials inputbridge-notary       # bir kez; anahtar bilgilerini sorar
+export NOTARY_KEYCHAIN_PROFILE=inputbridge-notary          # notarization istemiyorsan bunu atla
+macos/scripts/package-macos.sh
+```
+
+Kamera uzantısı yalnızca uygulama `/Applications` içindeyken etkinleşir. İlk etkinleştirmede macOS, Sistem Ayarları → Genel → Oturum Açma Öğeleri ve Uzantılar altında bir kez onay ister.
 
 ## Release öncesi zorunlu test
 
@@ -95,5 +110,7 @@ Yerel Xcode'da team'i Signing & Capabilities'den seç; `project.yml` içindeki `
 - [ ] G915 Bluetooth ↔ LIGHTSPEED geçişi üç kez arka arkaya doğru çalışıyor.
 - [ ] Z407 AUX ↔ Bluetooth geçişi test edildi.
 - [ ] İmzalı Mac build'de InputBridge Camera Sistem Ayarları'nda izinleniyor ve Zoom/Meet listesinde görünüyor.
-- [ ] Mac profilinde Windows Brio görüntüsü Mac sanal kameraya geliyor; Windows profilinde kamera yine yerel Windows'a dönüyor.
+- [ ] Mac profiline geçince Windows kamerasının ışığı **yanmıyor**; Mac'te Zoom/Meet/FaceTime InputBridge Camera'yı açınca yanıyor ve görüntü geliyor; uygulama kamerayı bırakınca birkaç saniye içinde sönüyor.
+- [ ] Windows profilinde kamera yine yerel Windows'a dönüyor.
+- [ ] İndirilen DMG başka bir Mac'te Gatekeeper uyarısı olmadan açılıyor (`spctl -a -vv /Applications/InputBridge.app` → `source=Notarized Developer ID`).
 - [ ] Mac login item ve Windows startup davranışı test edildi.

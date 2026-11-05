@@ -67,7 +67,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Unsigned macOS builds are intended for testing. Public macOS distribution should use Developer ID signing and notarization.
+Without signing secrets the macOS build is ad-hoc signed and meant for testing; the camera extension needs a Developer ID signed build. When the signing and notarization secrets are configured (see [docs/RELEASING_TR.md](docs/RELEASING_TR.md)), the workflow signs, notarizes and staples the DMG.
 
 ### Automatic updates
 

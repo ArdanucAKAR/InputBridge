@@ -13,6 +13,9 @@ settings:
     # Full version including any -beta suffix; read by the updater.
     INPUTBRIDGE_VERSION: "0.0.0"
     CURRENT_PROJECT_VERSION: "1"
+    # Developer ID provisioning profiles, passed in by scripts/package-macos.sh for signed builds.
+    INPUTBRIDGE_APP_PROFILE: ""
+    INPUTBRIDGE_CAMERA_PROFILE: ""
 targets:
   InputBridgeMac:
     type: application
@@ -32,6 +35,7 @@ targets:
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_ENTITLEMENTS: Resources/InputBridge.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(INPUTBRIDGE_APP_PROFILE)
     dependencies:
       - sdk: SwiftUI.framework
       - sdk: AppKit.framework
@@ -41,6 +45,7 @@ targets:
       - sdk: IOBluetooth.framework
       - sdk: SystemExtensions.framework
       - sdk: CryptoKit.framework
+      - sdk: CoreMediaIO.framework
       - target: InputBridgeCamera
         embed: true
         codeSign: true
@@ -63,6 +68,7 @@ targets:
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: YES
         CODE_SIGN_ENTITLEMENTS: Resources/CameraExtension.entitlements
+        PROVISIONING_PROFILE_SPECIFIER: $(INPUTBRIDGE_CAMERA_PROFILE)
         SKIP_INSTALL: YES
     dependencies:
       - sdk: CoreMediaIO.framework

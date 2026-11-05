@@ -81,16 +81,73 @@ jobs:
   macos:
     needs: metadata
     runs-on: macos-15
+    env:
+      # Signing and notarization run only when these secrets exist (they are not passed to forks),
+      # otherwise the job falls back to an ad-hoc signed build. See docs/RELEASING_TR.md.
+      HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && vars.MACOS_TEAM_ID != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_KEY_P8 != '' }}
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
         run: brew install xcodegen
+      - name: Import Developer ID certificate and provisioning profiles
+        if: env.HAS_SIGNING == 'true'
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APP_PROFILE_B64: ${{ secrets.MACOS_APP_PROFILE }}
+          CAMERA_PROFILE_B64: ${{ secrets.MACOS_CAMERA_PROFILE }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/certificate.p12"
+
+          install_profile() {
+            local file="$RUNNER_TEMP/$1.provisionprofile"
+            echo "$2" | base64 --decode > "$file"
+            local uuid
+            uuid=$(security cms -D -i "$file" | plutil -extract UUID raw -)
+            for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" \
+                       "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+              mkdir -p "$dir"
+              cp "$file" "$dir/$uuid.provisionprofile"
+            done
+            echo "$uuid"
+          }
+          echo "MACOS_APP_PROFILE=$(install_profile app "$APP_PROFILE_B64")" >> "$GITHUB_ENV"
+          echo "MACOS_CAMERA_PROFILE=$(install_profile camera "$CAMERA_PROFILE_B64")" >> "$GITHUB_ENV"
+          echo "MACOS_TEAM_ID=${{ vars.MACOS_TEAM_ID }}" >> "$GITHUB_ENV"
+      - name: Prepare notarization key
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          KEY="$RUNNER_TEMP/notary-key.p8"
+          echo "$NOTARY_KEY_P8" > "$KEY"
+          echo "NOTARY_KEY_PATH=$KEY" >> "$GITHUB_ENV"
       - name: Build macOS application and DMG
         env:
           INPUTBRIDGE_VERSION: ${{ needs.metadata.outputs.version }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
           chmod +x macos/scripts/package-macos.sh
           macos/scripts/package-macos.sh
+      - name: Remove signing material
+        if: always() && env.HAS_SIGNING == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP"/*.provisionprofile "$RUNNER_TEMP/notary-key.p8"
       - uses: actions/upload-artifact@v4
         with:
           name: InputBridge-macOS
