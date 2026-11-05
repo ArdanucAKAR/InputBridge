@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 import ServiceManagement
@@ -14,6 +15,8 @@ final class AppModel: ObservableObject {
     @Published var cameraShareEnabled = UserDefaults.standard.object(forKey: "camera-share-enabled") as? Bool ?? true
     @Published var manualHost = UserDefaults.standard.string(forKey: "manual-controller-host") ?? ""
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
+    /// Mirrors `updates.state` so the menu bar label (driven by this model) can show the update badge.
+    @Published private(set) var updateAvailable = false
 
     let discovery = DiscoveryService()
     let controller = ControllerClient()
@@ -27,6 +30,10 @@ final class AppModel: ObservableObject {
         discovery.start()
         restartKeyboardMonitor()
         cameraExtension.activate()
+        updates.$state
+            .map { $0 == .readyToInstall }
+            .removeDuplicates()
+            .assign(to: &$updateAvailable)
         updates.start()
     }
 

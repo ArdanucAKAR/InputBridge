@@ -33,7 +33,8 @@ public partial class MainWindow : Window
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(RefreshStatus); return; }
         StatusText.Text = _runtime.Status;
-        FooterText.Text = $"Controller ID: {_runtime.Settings.ControllerId} • Discovery UDP: {_runtime.Settings.DiscoveryPort} • HTTP: {_runtime.Settings.HttpPort}";
+        FooterText.Text = $"UDP {_runtime.Settings.DiscoveryPort} · HTTP {_runtime.Settings.HttpPort}";
+        ControllerIdText.Text = $"Controller ID: {_runtime.Settings.ControllerId}";
     }
 
     private void RefreshMonitors()
@@ -118,15 +119,26 @@ public partial class MainWindow : Window
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(RefreshUpdates); return; }
         var updates = _runtime.Updates;
-        CurrentVersionText.Text = updates.IsDevelopmentBuild
-            ? "Installed version: development build"
-            : $"Installed version: {updates.CurrentVersion.ToString(3)}";
+        var version = updates.IsDevelopmentBuild ? "development build" : updates.CurrentVersion.ToString(3);
+        CurrentVersionText.Text = $"InputBridge {version}";
+        SidebarVersionText.Text = $"Version {version}";
         UpdateStatusText.Text = updates.StatusText;
         var busy = updates.State is UpdateState.Checking or UpdateState.Downloading or UpdateState.Installing;
         CheckUpdatesButton.IsEnabled = !busy;
         InstallUpdateButton.IsEnabled = updates.State == UpdateState.ReadyToInstall;
         ReleaseNotesButton.IsEnabled = !string.IsNullOrEmpty(updates.Latest?.HtmlUrl);
+
+        var ready = updates.State == UpdateState.ReadyToInstall;
+        UpdateBanner.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
+        UpdatesNavBadge.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
+        UpdateBannerTitle.Text = $"InputBridge {updates.Latest?.Version.ToString(3)} is ready to install";
+        Taskbar.Overlay = ready ? (_overlay ??= AppIcons.CreateTaskbarOverlay()) : null;
+        Taskbar.Description = ready ? "InputBridge — update available" : "InputBridge";
     }
+
+    private System.Windows.Media.ImageSource? _overlay;
+
+    public void ShowPage(int index) => NavList.SelectedIndex = index;
 
     private void UpdateSettings_Click(object sender, RoutedEventArgs e)
     {

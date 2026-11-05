@@ -18,9 +18,11 @@ targets:
     sources:
       - path: Sources/InputBridgeMac
       - path: Sources/Shared
+      - path: Resources/Assets.xcassets
     settings:
       base:
         PRODUCT_NAME: InputBridge
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         PRODUCT_BUNDLE_IDENTIFIER: com.inputbridge.mac
         INFOPLIST_FILE: Resources/Info.plist
         GENERATE_INFOPLIST_FILE: NO

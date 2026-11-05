@@ -8,6 +8,8 @@ public partial class App : System.Windows.Application
     public static AppRuntime Runtime { get; private set; } = null!;
     private Forms.NotifyIcon? _tray;
     private Forms.ToolStripMenuItem? _updateMenuItem;
+    private System.Drawing.Icon? _trayIcon;
+    private System.Drawing.Icon? _badgedTrayIcon;
     private MainWindow? _window;
     private bool _startHidden;
 
@@ -22,8 +24,19 @@ public partial class App : System.Windows.Application
         MainWindow = _window;
         if (!_startHidden) _window.Show();
 
-        var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("Open", null, (_, _) => ShowMainWindow());
+        var menu = new Forms.ContextMenuStrip
+        {
+            Font = new System.Drawing.Font("Segoe UI", 9.5f),
+            ShowImageMargin = false,
+            Padding = new Forms.Padding(2, 4, 2, 4),
+            Renderer = new Forms.ToolStripProfessionalRenderer(new TrayMenuColors()) { RoundedEdges = false }
+        };
+        var open = new Forms.ToolStripMenuItem("Open InputBridge", null, (_, _) => ShowMainWindow())
+        {
+            Font = new System.Drawing.Font("Segoe UI", 9.5f, System.Drawing.FontStyle.Bold)
+        };
+        menu.Items.Add(open);
+        menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Apply Windows profile", null, async (_, _) => await Runtime.ApplyProfileAsync(ProfileMode.Windows));
         menu.Items.Add("Apply Mac profile", null, async (_, _) => await Runtime.ApplyProfileAsync(ProfileMode.Mac));
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -32,15 +45,20 @@ public partial class App : System.Windows.Application
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, async (_, _) => await ExitAsync());
 
+        _trayIcon = AppIcons.LoadTrayIcon();
         _tray = new Forms.NotifyIcon
         {
             Text = "InputBridge",
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = _trayIcon,
             Visible = true,
             ContextMenuStrip = menu
         };
         _tray.DoubleClick += (_, _) => ShowMainWindow();
-        _tray.BalloonTipClicked += (_, _) => Runtime.Updates.TryInstall();
+        _tray.BalloonTipClicked += (_, _) =>
+        {
+            ShowMainWindow();
+            _window?.ShowPage(3);
+        };
 
         Runtime.Updates.Changed += () => Dispatcher.BeginInvoke(RefreshUpdateMenu);
         Runtime.Updates.UpdateReady += info => Dispatcher.BeginInvoke(() => NotifyUpdateReady(info));
@@ -64,11 +82,27 @@ public partial class App : System.Windows.Application
 
     private void RefreshUpdateMenu()
     {
-        if (_updateMenuItem is null) return;
+        if (_updateMenuItem is null || _tray is null || _trayIcon is null) return;
         var updates = Runtime.Updates;
+        var ready = updates.State == UpdateState.ReadyToInstall;
+        if (ready)
+        {
+            _badgedTrayIcon ??= AppIcons.CreateBadgedIcon(_trayIcon);
+            _tray.Icon = _badgedTrayIcon;
+            _tray.Text = $"InputBridge — update {updates.Latest?.Version.ToString(3)} available";
+            _updateMenuItem.Font = new System.Drawing.Font(_updateMenuItem.Font, System.Drawing.FontStyle.Bold);
+            _updateMenuItem.ForeColor = System.Drawing.Color.FromArgb(234, 88, 12);
+        }
+        else
+        {
+            _tray.Icon = _trayIcon;
+            _tray.Text = "InputBridge";
+            _updateMenuItem.Font = new System.Drawing.Font(_updateMenuItem.Font, System.Drawing.FontStyle.Regular);
+            _updateMenuItem.ForeColor = System.Drawing.SystemColors.ControlText;
+        }
         _updateMenuItem.Text = updates.State switch
         {
-            UpdateState.ReadyToInstall => $"Install update {updates.Latest?.Version.ToString(3)} and restart",
+            UpdateState.ReadyToInstall => $"●  Install update {updates.Latest?.Version.ToString(3)} and restart",
             UpdateState.Checking => "Checking for updates…",
             UpdateState.Downloading => "Downloading update…",
             UpdateState.Installing => "Installing update…",
@@ -83,7 +117,7 @@ public partial class App : System.Windows.Application
         _tray?.ShowBalloonTip(
             10000,
             $"InputBridge {info.Version.ToString(3)} is available",
-            "Click here to install the update. InputBridge will restart.",
+            "Click to review and install. InputBridge restarts after the update.",
             Forms.ToolTipIcon.Info);
     }
 
@@ -107,5 +141,22 @@ public partial class App : System.Windows.Application
         if (_tray is not null) _tray.Visible = false;
         if (Runtime is not null) await Runtime.StopAsync();
         base.OnExit(e);
+    }
+
+    private sealed class TrayMenuColors : Forms.ProfessionalColorTable
+    {
+        private static readonly System.Drawing.Color Hover = System.Drawing.Color.FromArgb(232, 240, 254);
+        private static readonly System.Drawing.Color Line = System.Drawing.Color.FromArgb(226, 230, 236);
+        public override System.Drawing.Color MenuItemSelected => Hover;
+        public override System.Drawing.Color MenuItemSelectedGradientBegin => Hover;
+        public override System.Drawing.Color MenuItemSelectedGradientEnd => Hover;
+        public override System.Drawing.Color MenuItemBorder => Hover;
+        public override System.Drawing.Color MenuBorder => Line;
+        public override System.Drawing.Color SeparatorDark => Line;
+        public override System.Drawing.Color SeparatorLight => System.Drawing.Color.White;
+        public override System.Drawing.Color ToolStripDropDownBackground => System.Drawing.Color.White;
+        public override System.Drawing.Color ImageMarginGradientBegin => System.Drawing.Color.White;
+        public override System.Drawing.Color ImageMarginGradientMiddle => System.Drawing.Color.White;
+        public override System.Drawing.Color ImageMarginGradientEnd => System.Drawing.Color.White;
     }
 }

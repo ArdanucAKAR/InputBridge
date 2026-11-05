@@ -1,111 +1,292 @@
 <Window x:Class="InputBridge.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="InputBridge Controller" Height="610" Width="900" MinHeight="520" MinWidth="760">
-  <Grid Margin="18">
-    <Grid.RowDefinitions>
-      <RowDefinition Height="Auto"/>
-      <RowDefinition Height="*"/>
-      <RowDefinition Height="Auto"/>
-    </Grid.RowDefinitions>
+        Title="InputBridge" Height="680" Width="1040" MinHeight="560" MinWidth="860"
+        Icon="Assets/InputBridge.ico"
+        Background="{StaticResource WindowBrush}"
+        FontFamily="{StaticResource UiFont}" FontSize="13"
+        Foreground="{StaticResource TextBrush}"
+        WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+  <Window.TaskbarItemInfo>
+    <TaskbarItemInfo x:Name="Taskbar"/>
+  </Window.TaskbarItemInfo>
 
-    <Border Background="#F4F6F8" CornerRadius="8" Padding="14">
-      <Grid>
-        <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <StackPanel>
-          <TextBlock Text="InputBridge Controller" FontSize="22" FontWeight="SemiBold"/>
-          <TextBlock x:Name="StatusText" Margin="0,5,0,0" Foreground="#456" TextWrapping="Wrap"/>
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="236"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <!-- Sidebar -->
+    <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+      <DockPanel Margin="16,20,16,16">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="4,0,0,24">
+          <Image Source="Assets/InputBridge.png" Width="40" Height="40" RenderOptions.BitmapScalingMode="HighQuality"/>
+          <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="InputBridge" FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock Text="Windows Controller" Style="{StaticResource Caption}"/>
+          </StackPanel>
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-          <Button Margin="4" Padding="10,5" Click="ApplyWindows_Click">Apply Windows</Button>
-          <Button Margin="4" Padding="10,5" Click="ApplyMac_Click">Apply Mac</Button>
+
+        <StackPanel DockPanel.Dock="Bottom" Margin="4,12,0,0">
+          <TextBlock x:Name="SidebarVersionText" Style="{StaticResource Caption}"/>
+          <TextBlock x:Name="FooterText" Style="{StaticResource Caption}" Margin="0,4,0,0"/>
         </StackPanel>
-      </Grid>
+
+        <ListBox x:Name="NavList" Style="{StaticResource NavList}" SelectedIndex="0">
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Style="{StaticResource Glyph}" Text="&#xE7F4;" Margin="0,0,12,0"/>
+              <TextBlock Text="Monitors"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Style="{StaticResource Glyph}" Text="&#xE722;" Margin="0,0,12,0"/>
+              <TextBlock Text="Camera"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Style="{StaticResource Glyph}" Text="&#xE71B;" Margin="0,0,12,0"/>
+              <TextBlock Text="Pairing"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <Grid>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Style="{StaticResource Glyph}" Text="&#xE895;" Margin="0,0,12,0"/>
+                <TextBlock Text="Updates"/>
+              </StackPanel>
+              <Ellipse x:Name="UpdatesNavBadge" Width="8" Height="8" Fill="{StaticResource WarningBrush}"
+                       HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"/>
+            </Grid>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Style="{StaticResource Glyph}" Text="&#xE946;" Margin="0,0,12,0"/>
+              <TextBlock Text="About"/>
+            </StackPanel>
+          </ListBoxItem>
+        </ListBox>
+      </DockPanel>
     </Border>
 
-    <TabControl Grid.Row="1" Margin="0,14,0,14">
-      <TabItem Header="Monitors">
-        <Grid Margin="12">
-          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <TextBlock Text="Choose the physical monitors that belong to the shared workspace. Input values use DDC/CI VCP 0x60." TextWrapping="Wrap"/>
-          <DataGrid x:Name="MonitorGrid" Grid.Row="1" Margin="0,12,0,12" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="False">
-            <DataGrid.Columns>
-              <DataGridCheckBoxColumn Header="Use" Binding="{Binding Enabled, Mode=TwoWay}" Width="55"/>
-              <DataGridTextColumn Header="Monitor" Binding="{Binding Description}" IsReadOnly="True" Width="*"/>
-              <DataGridTextColumn Header="Current" Binding="{Binding CurrentInputHex}" IsReadOnly="True" Width="85"/>
-              <DataGridTextColumn Header="Windows input" Binding="{Binding WindowsInputHex, Mode=TwoWay}" Width="120"/>
-              <DataGridTextColumn Header="Mac input" Binding="{Binding MacInputHex, Mode=TwoWay}" Width="100"/>
-            </DataGrid.Columns>
-          </DataGrid>
-          <StackPanel Grid.Row="2" Orientation="Horizontal">
-            <Button Padding="10,5" Margin="0,0,8,0" Click="RefreshMonitors_Click">Refresh monitors</Button>
-            <Button Padding="10,5" Click="SaveMonitors_Click">Save monitor setup</Button>
-          </StackPanel>
-        </Grid>
-      </TabItem>
-      <TabItem Header="Camera">
-        <Grid Margin="12">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-          </Grid.RowDefinitions>
-          <TextBlock TextWrapping="Wrap" Text="Share a USB camera attached to this PC with the paired Mac over the local network. The camera stays plugged into Windows. Enable this, pick the Brio, then apply the Mac profile."/>
-          <CheckBox x:Name="CameraShareEnabled" Grid.Row="1" Margin="0,14,0,8" Content="Enable camera share to Mac"/>
-          <Grid Grid.Row="2" Margin="0,0,0,12">
+    <!-- Main area -->
+    <Grid Grid.Column="1" Margin="28,22,28,20">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- Status + profile actions -->
+      <Border Style="{StaticResource Card}" Padding="18,14">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Grid VerticalAlignment="Center" Margin="0,0,16,0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto"/>
               <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Camera" VerticalAlignment="Center" Margin="0,0,12,0"/>
-            <ComboBox x:Name="CameraList" Grid.Column="1" DisplayMemberPath="Name" SelectedValuePath="Id"/>
+            <Ellipse Width="10" Height="10" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" Margin="12,0,0,0">
+              <TextBlock Text="Controller status" Style="{StaticResource Caption}"/>
+              <TextBlock x:Name="StatusText" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                         ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            </StackPanel>
           </Grid>
-          <StackPanel Grid.Row="3" Orientation="Horizontal" VerticalAlignment="Top">
-            <Button Padding="10,5" Margin="0,0,8,0" Click="RefreshCameras_Click">Refresh cameras</Button>
-            <Button Padding="10,5" Click="SaveCamera_Click">Save camera setup</Button>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Margin="0,0,8,0" Click="ApplyWindows_Click" ToolTip="Switch monitors and camera to this PC">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Style="{StaticResource Glyph}" FontSize="14" Text="&#xE7F4;" Margin="0,0,8,0"/>
+                <TextBlock Text="Windows profile"/>
+              </StackPanel>
+            </Button>
+            <Button Style="{StaticResource PrimaryButton}" Click="ApplyMac_Click" ToolTip="Switch monitors and camera to the paired Mac">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Style="{StaticResource Glyph}" FontSize="14" Text="&#xE7F8;" Margin="0,0,8,0"/>
+                <TextBlock Text="Mac profile"/>
+              </StackPanel>
+            </Button>
           </StackPanel>
         </Grid>
-      </TabItem>
-      <TabItem Header="Pairing">
-        <Grid Margin="12">
-          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-          <TextBlock Text="A Mac companion discovered on the local network requests pairing here. Approval creates a token without copying IP addresses or secrets." TextWrapping="Wrap"/>
-          <DataGrid x:Name="PairingGrid" Grid.Row="1" Margin="0,12,0,12" AutoGenerateColumns="False" IsReadOnly="True">
-            <DataGrid.Columns>
-              <DataGridTextColumn Header="Mac" Binding="{Binding ClientName}" Width="*"/>
-              <DataGridTextColumn Header="Requested" Binding="{Binding RequestedAtLocal}" Width="180"/>
-              <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="100"/>
-            </DataGrid.Columns>
-          </DataGrid>
-          <StackPanel Grid.Row="2" Orientation="Horizontal">
-            <Button Padding="10,5" Margin="0,0,8,0" Click="ApprovePairing_Click">Approve selected</Button>
-            <Button Padding="10,5" Click="RejectPairing_Click">Reject selected</Button>
-          </StackPanel>
-        </Grid>
-      </TabItem>
-      <TabItem Header="Updates">
-        <StackPanel Margin="12">
-          <TextBlock TextWrapping="Wrap" Text="InputBridge checks GitHub Releases for new versions, downloads the Windows installer in the background and verifies its SHA-256 digest before installing."/>
-          <TextBlock x:Name="CurrentVersionText" Margin="0,14,0,0" FontWeight="SemiBold"/>
-          <TextBlock x:Name="UpdateStatusText" Margin="0,6,0,0" Foreground="#456" TextWrapping="Wrap"/>
-          <CheckBox x:Name="AutoCheckUpdates" Margin="0,16,0,6" Content="Check for updates automatically (every 6 hours)" Click="UpdateSettings_Click"/>
-          <CheckBox x:Name="AutoInstallUpdates" Margin="0,0,0,14" Content="Install updates automatically (Windows asks for administrator approval)" Click="UpdateSettings_Click"/>
-          <StackPanel Orientation="Horizontal">
-            <Button x:Name="CheckUpdatesButton" Padding="10,5" Margin="0,0,8,0" Click="CheckUpdates_Click">Check now</Button>
-            <Button x:Name="InstallUpdateButton" Padding="10,5" Margin="0,0,8,0" Click="InstallUpdate_Click" IsEnabled="False">Install and restart</Button>
-            <Button x:Name="ReleaseNotesButton" Padding="10,5" Click="ReleaseNotes_Click" IsEnabled="False">Release notes</Button>
-          </StackPanel>
-        </StackPanel>
-      </TabItem>
-      <TabItem Header="About">
-        <StackPanel Margin="16">
-          <TextBlock FontSize="16" FontWeight="SemiBold" Text="InputBridge local controller"/>
-          <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Text="The controller uses UDP multicast discovery on port 41716 and HTTP on port 41715 by default. Your installer should create Private-network firewall rules for both ports. Pairing tokens are never displayed in this UI."/>
-        </StackPanel>
-      </TabItem>
-    </TabControl>
+      </Border>
 
-    <TextBlock x:Name="FooterText" Grid.Row="2" Foreground="#666" TextWrapping="Wrap"/>
+      <!-- Update banner -->
+      <Border x:Name="UpdateBanner" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource WarningSoftBrush}"
+              BorderBrush="#FCD9B6" BorderThickness="1" CornerRadius="10" Padding="16,12" Margin="0,0,0,14">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Grid Width="28" Height="28" VerticalAlignment="Center">
+            <Ellipse Fill="{StaticResource WarningBrush}"/>
+            <TextBlock Style="{StaticResource Glyph}" FontSize="14" Text="&#xE896;" Foreground="White" HorizontalAlignment="Center"/>
+          </Grid>
+          <StackPanel Grid.Column="1" Margin="12,0" VerticalAlignment="Center">
+            <TextBlock x:Name="UpdateBannerTitle" FontWeight="SemiBold"/>
+            <TextBlock Text="The installer is downloaded and verified. InputBridge restarts after installing." Style="{StaticResource Caption}"/>
+          </StackPanel>
+          <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Click="InstallUpdate_Click" VerticalAlignment="Center">Install and restart</Button>
+        </Grid>
+      </Border>
+
+      <TabControl Grid.Row="2" Style="{StaticResource PageHost}" SelectedIndex="{Binding SelectedIndex, ElementName=NavList}">
+        <!-- Monitors -->
+        <TabItem>
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top">
+              <TextBlock Text="Monitors" Style="{StaticResource PageTitle}"/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="Choose the displays that belong to the shared workspace and the DDC/CI input (VCP 0x60) each profile should select."/>
+            </StackPanel>
+            <Border Style="{StaticResource Card}" Margin="0">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                  <Button Margin="0,0,8,0" Click="RefreshMonitors_Click">
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Style="{StaticResource Glyph}" FontSize="13" Text="&#xE72C;" Margin="0,0,8,0"/>
+                      <TextBlock Text="Refresh"/>
+                    </StackPanel>
+                  </Button>
+                  <Button Style="{StaticResource PrimaryButton}" Click="SaveMonitors_Click">Save monitor setup</Button>
+                </StackPanel>
+                <DataGrid x:Name="MonitorGrid" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="False">
+                  <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="Use" Binding="{Binding Enabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
+                    <DataGridTextColumn Header="Monitor" Binding="{Binding Description}" IsReadOnly="True" Width="*"/>
+                    <DataGridTextColumn Header="Current" Binding="{Binding CurrentInputHex}" IsReadOnly="True" Width="90"/>
+                    <DataGridTextColumn Header="Windows input" Binding="{Binding WindowsInputHex, Mode=TwoWay}" Width="130"/>
+                    <DataGridTextColumn Header="Mac input" Binding="{Binding MacInputHex, Mode=TwoWay}" Width="110"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+              </DockPanel>
+            </Border>
+          </DockPanel>
+        </TabItem>
+
+        <!-- Camera -->
+        <TabItem>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <TextBlock Text="Camera" Style="{StaticResource PageTitle}"/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="Share a USB camera attached to this PC with the paired Mac. The camera stays plugged into Windows and streams only while the Mac profile is active."/>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <CheckBox x:Name="CameraShareEnabled" Style="{StaticResource ToggleSwitch}" Content="Share camera with the Mac"/>
+                  <TextBlock Text="Camera device" Style="{StaticResource Caption}" Margin="0,20,0,6"/>
+                  <ComboBox x:Name="CameraList" DisplayMemberPath="Name" SelectedValuePath="Id" MaxWidth="460" HorizontalAlignment="Left" MinWidth="320"/>
+                  <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                    <Button Margin="0,0,8,0" Click="RefreshCameras_Click">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Glyph}" FontSize="13" Text="&#xE72C;" Margin="0,0,8,0"/>
+                        <TextBlock Text="Refresh"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource PrimaryButton}" Click="SaveCamera_Click">Save camera setup</Button>
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- Pairing -->
+        <TabItem>
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top">
+              <TextBlock Text="Pairing" Style="{StaticResource PageTitle}"/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="Macs on the local network ask to pair here. Approving creates a private token; no IP addresses or secrets need to be copied."/>
+            </StackPanel>
+            <Border Style="{StaticResource Card}" Margin="0">
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                  <Button Margin="0,0,8,0" Click="RejectPairing_Click">Reject</Button>
+                  <Button Style="{StaticResource PrimaryButton}" Click="ApprovePairing_Click">Approve</Button>
+                </StackPanel>
+                <DataGrid x:Name="PairingGrid" AutoGenerateColumns="False" IsReadOnly="True">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Mac" Binding="{Binding ClientName}" Width="*"/>
+                    <DataGridTextColumn Header="Requested" Binding="{Binding RequestedAtLocal}" Width="180"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="110"/>
+                  </DataGrid.Columns>
+                </DataGrid>
+              </DockPanel>
+            </Border>
+          </DockPanel>
+        </TabItem>
+
+        <!-- Updates -->
+        <TabItem>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <TextBlock Text="Updates" Style="{StaticResource PageTitle}"/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="New versions are downloaded from GitHub Releases in the background and checked against their SHA-256 digest before installing."/>
+              <Border Style="{StaticResource Card}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Image Source="Assets/InputBridge.png" Width="56" Height="56" VerticalAlignment="Top" RenderOptions.BitmapScalingMode="HighQuality"/>
+                  <StackPanel Grid.Column="1" Margin="16,2,0,0">
+                    <TextBlock x:Name="CurrentVersionText" Style="{StaticResource CardTitle}"/>
+                    <TextBlock x:Name="UpdateStatusText" Style="{StaticResource Caption}" Margin="0,4,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                      <Button x:Name="CheckUpdatesButton" Margin="0,0,8,0" Click="CheckUpdates_Click">
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Style="{StaticResource Glyph}" FontSize="13" Text="&#xE895;" Margin="0,0,8,0"/>
+                          <TextBlock Text="Check now"/>
+                        </StackPanel>
+                      </Button>
+                      <Button x:Name="InstallUpdateButton" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0" Click="InstallUpdate_Click" IsEnabled="False">Install and restart</Button>
+                      <Button x:Name="ReleaseNotesButton" Click="ReleaseNotes_Click" IsEnabled="False">Release notes</Button>
+                    </StackPanel>
+                  </StackPanel>
+                </Grid>
+              </Border>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Preferences" Style="{StaticResource CardTitle}" Margin="0,0,0,14"/>
+                  <CheckBox x:Name="AutoCheckUpdates" Style="{StaticResource ToggleSwitch}" Click="UpdateSettings_Click"
+                            Content="Check for updates automatically (every 6 hours)"/>
+                  <CheckBox x:Name="AutoInstallUpdates" Style="{StaticResource ToggleSwitch}" Click="UpdateSettings_Click" Margin="0,14,0,0"
+                            Content="Install updates automatically (Windows asks for administrator approval)"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+
+        <!-- About -->
+        <TabItem>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <TextBlock Text="About" Style="{StaticResource PageTitle}"/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="InputBridge switches monitors, speakers and the camera between this PC and a paired Mac."/>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Network" Style="{StaticResource CardTitle}"/>
+                  <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
+                             Text="The controller answers UDP multicast discovery on port 41716 and serves its API over HTTP on port 41715. The installer adds Private-network firewall rules for both ports. Pairing tokens are never shown in this window."/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Controller" Style="{StaticResource CardTitle}"/>
+                  <TextBlock x:Name="ControllerIdText" Style="{StaticResource Caption}" Margin="0,6,0,0"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+      </TabControl>
+    </Grid>
   </Grid>
 </Window>

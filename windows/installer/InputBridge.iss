@@ -19,6 +19,8 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64
 DisableProgramGroupPage=yes
 WizardStyle=modern
+SetupIconFile=..\src\InputBridge.Windows\Assets\InputBridge.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
 CloseApplications=yes
 RestartApplications=no
 

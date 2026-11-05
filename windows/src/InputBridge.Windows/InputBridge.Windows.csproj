@@ -12,7 +12,12 @@
     <RootNamespace>InputBridge.Windows</RootNamespace>
     <!-- Release builds pass -p:Version=x.y.z; 0.0.0 marks a local development build (no automatic update checks). -->
     <Version>0.0.0</Version>
+    <ApplicationIcon>Assets\InputBridge.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets\InputBridge.ico" />
+    <Resource Include="Assets\InputBridge.png" />
+  </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
