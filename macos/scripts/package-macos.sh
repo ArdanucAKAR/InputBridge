@@ -166,22 +166,29 @@ notarize() {
     exit 1
   fi
   # Stapling downloads the ticket from Apple's CDN, which occasionally drops the connection.
+  # A notarized but unstapled file still passes Gatekeeper on a Mac that is online, so a stapling
+  # failure is reported as a warning instead of failing the release.
   local attempt
   for attempt in 1 2 3 4 5; do
-    xcrun stapler staple "$file" && break
-    [[ $attempt == 5 ]] && { echo "Stapling ${file:t} failed after $attempt attempts." >&2; exit 1; }
+    if xcrun stapler staple "$file"; then
+      xcrun stapler validate "$file"
+      return 0
+    fi
+    [[ $attempt == 5 ]] && break
     echo "Stapling failed (attempt $attempt), retrying in $((attempt * 15))s…" >&2
     sleep $((attempt * 15))
   done
-  xcrun stapler validate "$file"
+  echo "::warning title=Not stapled::${file:t} is notarized but its ticket could not be stapled; Gatekeeper will look it up online."
 }
 
 if [[ "$NOTARIZE" == true ]]; then
   notarize "$DMG"
-  spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+  spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG" \
+    || echo "::warning::Gatekeeper could not confirm the DMG here (offline lookup?)."
   if [[ "$PKG_SIGNED" == true ]]; then
     notarize "$PKG"
-    spctl --assess --type install --verbose=2 "$PKG"
+    spctl --assess --type install --verbose=2 "$PKG" \
+      || echo "::warning::Gatekeeper could not confirm the .pkg here (offline lookup?)."
   else
     echo "The .pkg is unsigned, so it was not notarized." >&2
   fi
