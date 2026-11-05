@@ -84,10 +84,31 @@ jobs:
     env:
       # Signing and notarization run only when these secrets exist (they are not passed to forks),
       # otherwise the job falls back to an ad-hoc signed build. See docs/RELEASING_TR.md.
-      HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && vars.MACOS_TEAM_ID != '' }}
+      # MACOS_TEAM_ID is not secret; it is read from the repository variable, or from a secret of that name.
+      TEAM_ID: ${{ vars.MACOS_TEAM_ID || secrets.MACOS_TEAM_ID }}
+      HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && (vars.MACOS_TEAM_ID || secrets.MACOS_TEAM_ID) != '' }}
       HAS_NOTARY: ${{ secrets.NOTARY_KEY_P8 != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Report signing configuration
+        # Prints only whether each value is set, never the values.
+        run: |
+          echo "MACOS_TEAM_ID set:              ${{ env.TEAM_ID != '' }}"
+          echo "MACOS_CERTIFICATE_P12 set:      ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}"
+          echo "MACOS_CERTIFICATE_PASSWORD set: ${{ secrets.MACOS_CERTIFICATE_PASSWORD != '' }}"
+          echo "MACOS_APP_PROFILE set:          ${{ secrets.MACOS_APP_PROFILE != '' }}"
+          echo "MACOS_CAMERA_PROFILE set:       ${{ secrets.MACOS_CAMERA_PROFILE != '' }}"
+          echo "NOTARY_KEY_P8 set:              ${{ secrets.NOTARY_KEY_P8 != '' }}"
+          echo "NOTARY_KEY_ID set:              ${{ secrets.NOTARY_KEY_ID != '' }}"
+          echo "NOTARY_ISSUER_ID set:           ${{ secrets.NOTARY_ISSUER_ID != '' }}"
+          if [[ "$HAS_SIGNING" != "true" ]]; then
+            echo "::warning title=Unsigned macOS build::Signing secrets are missing; the .pkg and DMG will be ad-hoc signed and the camera extension will not load."
+          fi
+          # Expression comparison is case-insensitive, so this matches the owner however GitHub spells it.
+          if [[ "${{ github.ref_type == 'tag' && github.repository_owner == 'ardanucakar' }}" == "true" && "$HAS_SIGNING" != "true" ]]; then
+            echo "::error::Refusing to publish an unsigned macOS release from the main repository."
+            exit 1
+          fi
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Import Developer ID certificate and provisioning profiles
@@ -128,7 +149,7 @@ jobs:
           }
           echo "MACOS_APP_PROFILE=$(install_profile app "$APP_PROFILE_B64")" >> "$GITHUB_ENV"
           echo "MACOS_CAMERA_PROFILE=$(install_profile camera "$CAMERA_PROFILE_B64")" >> "$GITHUB_ENV"
-          echo "MACOS_TEAM_ID=${{ vars.MACOS_TEAM_ID }}" >> "$GITHUB_ENV"
+          echo "MACOS_TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
       - name: Prepare notarization key
         if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
         env:
