@@ -165,7 +165,14 @@ notarize() {
     echo "Notarization of ${file:t} failed with status: $notary_status" >&2
     exit 1
   fi
-  xcrun stapler staple "$file"
+  # Stapling downloads the ticket from Apple's CDN, which occasionally drops the connection.
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    xcrun stapler staple "$file" && break
+    [[ $attempt == 5 ]] && { echo "Stapling ${file:t} failed after $attempt attempts." >&2; exit 1; }
+    echo "Stapling failed (attempt $attempt), retrying in $((attempt * 15))s…" >&2
+    sleep $((attempt * 15))
+  done
   xcrun stapler validate "$file"
 }
 
