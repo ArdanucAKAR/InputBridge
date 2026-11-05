@@ -544,6 +544,14 @@ private struct UpdatesPane: View {
             Section {
                 Toggle("Check for updates automatically", isOn: $updates.autoCheck)
                 Toggle("Install updates automatically", isOn: $updates.autoInstall)
+                Toggle(isOn: $updates.betaUpdates) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Receive beta versions")
+                        Text("Also offers pre-releases (for example 0.3.0-beta.1). Betas may be less stable.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } header: {
                 Text("Preferences")
             } footer: {

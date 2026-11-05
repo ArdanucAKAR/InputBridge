@@ -2,15 +2,17 @@ import AppKit
 import CryptoKit
 import Foundation
 
-/// Polls GitHub Releases for a newer published (non-draft, non-prerelease) version,
-/// downloads the macOS DMG, verifies its SHA-256 digest, swaps the app bundle in place
-/// after InputBridge quits and relaunches it.
+/// Polls GitHub Releases for a newer version, downloads the macOS DMG, verifies its SHA-256
+/// digest, swaps the app bundle in place after InputBridge quits and relaunches it.
+/// The stable channel only sees the release GitHub marks as latest; the beta channel also
+/// considers pre-releases.
 @MainActor
 final class UpdateManager: ObservableObject {
     enum State: Equatable { case idle, checking, upToDate, downloading, readyToInstall, installing, failed }
 
     struct Release: Equatable {
-        let version: String
+        let semver: SemVer
+        var version: String { semver.description }
         let tag: String
         let pageURL: URL?
         let downloadURL: URL
@@ -33,9 +35,18 @@ final class UpdateManager: ObservableObject {
     @Published var autoInstall: Bool {
         didSet { UserDefaults.standard.set(autoInstall, forKey: "updates-auto-install") }
     }
+    /// Also offer pre-releases. Defaults to on when this build itself is a pre-release.
+    @Published var betaUpdates: Bool {
+        didSet {
+            guard betaUpdates != oldValue else { return }
+            UserDefaults.standard.set(betaUpdates, forKey: "updates-beta")
+            Task { await self.check(userInitiated: true) }
+        }
+    }
 
-    let currentVersion: String
-    var isDevelopmentBuild: Bool { Self.isDevelopmentVersion(currentVersion) }
+    let currentSemVer: SemVer
+    var currentVersion: String { currentSemVer.description }
+    var isDevelopmentBuild: Bool { currentSemVer == .zero }
     var isBusy: Bool { state == .checking || state == .downloading || state == .installing }
 
     private var downloadedDMG: URL?
@@ -45,13 +56,14 @@ final class UpdateManager: ObservableObject {
     private let workDirectory: URL
 
     init() {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
-        currentVersion = version
+        let version = Self.readCurrentVersion(of: Bundle.main)
+        currentSemVer = version
         autoCheck = UserDefaults.standard.object(forKey: "updates-auto-check") as? Bool ?? true
         autoInstall = UserDefaults.standard.bool(forKey: "updates-auto-install")
-        status = Self.isDevelopmentVersion(version)
+        betaUpdates = UserDefaults.standard.object(forKey: "updates-beta") as? Bool ?? version.isPrerelease
+        status = version == .zero
             ? "Development build — automatic update checks are off."
-            : "Version \(version)."
+            : "Version \(version.description)."
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = 30
@@ -91,7 +103,7 @@ final class UpdateManager: ObservableObject {
                 return
             }
             latest = release
-            guard Self.compare(release.version, currentVersion) == .orderedDescending else {
+            guard release.semver > currentSemVer else {
                 setState(.upToDate, "InputBridge \(currentVersion) is up to date.")
                 return
             }
@@ -130,7 +142,7 @@ final class UpdateManager: ObservableObject {
 
         setState(.installing, "Installing InputBridge \(release.version)… InputBridge will restart.")
         do {
-            let staged = try stageApp(from: dmg, expectedVersion: release.version)
+            let staged = try stageApp(from: dmg, expectedVersion: release.semver)
             try launchReplacementHelper(staged: staged, target: appURL)
             NSApplication.shared.terminate(nil)
         } catch {
@@ -155,12 +167,27 @@ final class UpdateManager: ObservableObject {
         let assets: [Asset]
     }
 
-    private var userAgent: String { "InputBridge-Updater/\(currentVersion.isEmpty ? "0.0.0" : currentVersion)" }
+    private var userAgent: String { "InputBridge-Updater/\(currentVersion)" }
 
     private func fetchLatest() async throws -> Release? {
-        guard let url = URL(string: "https://api.github.com/repos/\(Self.owner)/\(Self.repository)/releases/latest") else {
-            throw UpdateError.badResponse
+        let base = "https://api.github.com/repos/\(Self.owner)/\(Self.repository)/releases"
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+
+        if betaUpdates {
+            // Beta channel: newest version among recent published releases, pre-releases included.
+            guard let data = try await getJSON(base + "?per_page=30") else { return nil }
+            let releases = try decoder.decode([GitHubRelease].self, from: data)
+            return releases.compactMap(Self.makeRelease).max { $0.semver < $1.semver }
         }
+
+        guard let data = try await getJSON(base + "/latest") else { return nil }
+        let release = try decoder.decode(GitHubRelease.self, from: data)
+        return release.prerelease ? nil : Self.makeRelease(release)
+    }
+
+    private func getJSON(_ address: String) async throws -> Data? {
+        guard let url = URL(string: address) else { throw UpdateError.badResponse }
         var request = URLRequest(url: url)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
@@ -171,11 +198,11 @@ final class UpdateManager: ObservableObject {
         if http.statusCode == 404 { return nil }
         if http.statusCode == 403 || http.statusCode == 429 { throw UpdateError.rateLimited }
         guard (200..<300).contains(http.statusCode) else { throw UpdateError.http(http.statusCode) }
+        return data
+    }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let release = try decoder.decode(GitHubRelease.self, from: data)
-        guard !release.draft, !release.prerelease, let version = Self.normalizedVersion(release.tagName) else {
+    private static func makeRelease(_ release: GitHubRelease) -> Release? {
+        guard !release.draft, let version = SemVer(release.tagName) else {
             return nil
         }
         guard let asset = release.assets.first(where: { $0.name.caseInsensitiveCompare(Self.assetName) == .orderedSame }),
@@ -195,7 +222,7 @@ final class UpdateManager: ObservableObject {
         }
 
         return Release(
-            version: version,
+            semver: version,
             tag: release.tagName,
             pageURL: pageURL,
             downloadURL: downloadURL,
@@ -237,7 +264,7 @@ final class UpdateManager: ObservableObject {
 
     // MARK: - Install
 
-    private func stageApp(from dmg: URL, expectedVersion: String) throws -> URL {
+    private func stageApp(from dmg: URL, expectedVersion: SemVer) throws -> URL {
         let fileManager = FileManager.default
         let mountPoint = workDirectory.appendingPathComponent("mount-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: mountPoint, withIntermediateDirectories: true)
@@ -250,12 +277,11 @@ final class UpdateManager: ObservableObject {
         let source = mountPoint.appendingPathComponent("InputBridge.app", isDirectory: true)
         guard let bundle = Bundle(url: source),
               bundle.bundleIdentifier == Bundle.main.bundleIdentifier,
-              let newVersion = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
-              Self.compare(newVersion, expectedVersion) == .orderedSame else {
+              Self.readCurrentVersion(of: bundle).hasSameCore(as: expectedVersion) else {
             throw UpdateError.invalidBundle
         }
 
-        let stagingDirectory = workDirectory.appendingPathComponent("staged-\(expectedVersion)", isDirectory: true)
+        let stagingDirectory = workDirectory.appendingPathComponent("staged-\(expectedVersion.description)", isDirectory: true)
         try? fileManager.removeItem(at: stagingDirectory)
         try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
         let stagedApp = stagingDirectory.appendingPathComponent("InputBridge.app", isDirectory: true)
@@ -326,34 +352,14 @@ final class UpdateManager: ObservableObject {
         self.status = status
     }
 
-    nonisolated static func isDevelopmentVersion(_ version: String) -> Bool {
-        version.isEmpty || compare(version, "0.0.0") == .orderedSame
-    }
-
-    nonisolated static func normalizedVersion(_ raw: String) -> String? {
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.hasPrefix("v") || text.hasPrefix("V") { text.removeFirst() }
-        if let cut = text.firstIndex(where: { $0 == "-" || $0 == "+" }) {
-            text = String(text[..<cut])
+    /// Full version stamped by the release build (keeps a -beta suffix), else the bundle short version.
+    nonisolated static func readCurrentVersion(of bundle: Bundle) -> SemVer {
+        for key in ["InputBridgeVersion", "CFBundleShortVersionString"] {
+            if let raw = bundle.object(forInfoDictionaryKey: key) as? String, let version = SemVer(raw) {
+                return version
+            }
         }
-        let parts = text.split(separator: ".", omittingEmptySubsequences: false)
-        guard !parts.isEmpty,
-              parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isASCII && $0.isNumber } }) else {
-            return nil
-        }
-        return text
-    }
-
-    nonisolated static func compare(_ lhs: String, _ rhs: String) -> ComparisonResult {
-        let left = (normalizedVersion(lhs) ?? "0").split(separator: ".").map { Int($0) ?? 0 }
-        let right = (normalizedVersion(rhs) ?? "0").split(separator: ".").map { Int($0) ?? 0 }
-        for index in 0..<max(left.count, right.count) {
-            let l = index < left.count ? left[index] : 0
-            let r = index < right.count ? right[index] : 0
-            if l < r { return .orderedAscending }
-            if l > r { return .orderedDescending }
-        }
-        return .orderedSame
+        return .zero
     }
 
     private nonisolated static func sha256Hex(of url: URL) throws -> String {

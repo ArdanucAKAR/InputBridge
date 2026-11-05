@@ -10,6 +10,8 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "13.0"
     # Release builds override these from the git tag; 0.0.0 marks a local development build.
     MARKETING_VERSION: "0.0.0"
+    # Full version including any -beta suffix; read by the updater.
+    INPUTBRIDGE_VERSION: "0.0.0"
     CURRENT_PROJECT_VERSION: "1"
 targets:
   InputBridgeMac:

@@ -11,11 +11,12 @@ namespace InputBridge.Windows;
 
 public enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, ReadyToInstall, Installing, Failed }
 
-public sealed record UpdateInfo(Version Version, string Tag, string HtmlUrl, string AssetName, Uri DownloadUrl, long Size, string? Sha256);
+public sealed record UpdateInfo(SemVer Version, string Tag, string HtmlUrl, string AssetName, Uri DownloadUrl, long Size, string? Sha256);
 
 /// <summary>
-/// Polls GitHub Releases for a newer published (non-draft, non-prerelease) version,
-/// downloads the Windows installer, verifies its SHA-256 digest and runs it silently.
+/// Polls GitHub Releases for a newer version, downloads the Windows installer, verifies its
+/// SHA-256 digest and runs it silently. The stable channel only sees the release GitHub marks
+/// as latest; the beta channel also considers pre-releases.
 /// </summary>
 public sealed class UpdateService : IDisposable
 {
@@ -33,8 +34,10 @@ public sealed class UpdateService : IDisposable
     private readonly string _downloadDirectory;
     private Task? _loop;
 
-    public Version CurrentVersion { get; }
-    public bool IsDevelopmentBuild => CurrentVersion == new Version(0, 0, 0, 0);
+    public static bool IsRunningPrerelease { get; } = ReadCurrentVersion().IsPrerelease;
+
+    public SemVer CurrentVersion { get; }
+    public bool IsDevelopmentBuild => CurrentVersion == SemVer.Zero;
     public UpdateState State { get; private set; } = UpdateState.Idle;
     public string StatusText { get; private set; } = "";
     public UpdateInfo? Latest { get; private set; }
@@ -49,13 +52,13 @@ public sealed class UpdateService : IDisposable
     public UpdateService(AppSettings settings)
     {
         _settings = settings;
-        CurrentVersion = Normalize(Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0, 0, 0));
+        CurrentVersion = ReadCurrentVersion();
         _downloadDirectory = Path.Combine(Path.GetTempPath(), "InputBridge", "updates");
         _http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("InputBridge-Updater", CurrentVersion.ToString(3)));
+        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("InputBridge-Updater", CurrentVersion.ToString()));
         StatusText = IsDevelopmentBuild
             ? "Development build — automatic update checks are off."
-            : $"Version {CurrentVersion.ToString(3)}.";
+            : $"Version {CurrentVersion}.";
     }
 
     public void Start()
@@ -95,14 +98,14 @@ public sealed class UpdateService : IDisposable
             var latest = await FetchLatestAsync(token);
             if (latest is null)
             {
-                SetState(UpdateState.UpToDate, $"No Windows installer found in the latest release. Current version {CurrentVersion.ToString(3)}.");
+                SetState(UpdateState.UpToDate, $"No Windows installer found in the latest release. Current version {CurrentVersion}.");
                 return;
             }
 
             Latest = latest;
             if (latest.Version <= CurrentVersion)
             {
-                SetState(UpdateState.UpToDate, $"InputBridge {CurrentVersion.ToString(3)} is up to date.");
+                SetState(UpdateState.UpToDate, $"InputBridge {CurrentVersion} is up to date.");
                 return;
             }
 
@@ -110,11 +113,11 @@ public sealed class UpdateService : IDisposable
                 && Path.GetFileName(Path.GetDirectoryName(DownloadedInstallerPath)) == latest.Tag;
             if (!alreadyDownloaded)
             {
-                SetState(UpdateState.Downloading, $"Downloading InputBridge {latest.Version.ToString(3)}…");
+                SetState(UpdateState.Downloading, $"Downloading InputBridge {latest.Version}…");
                 DownloadedInstallerPath = await DownloadAsync(latest, token);
             }
 
-            SetState(UpdateState.ReadyToInstall, $"InputBridge {latest.Version.ToString(3)} is ready to install.");
+            SetState(UpdateState.ReadyToInstall, $"InputBridge {latest.Version} is ready to install.");
             if (!alreadyDownloaded) UpdateReady?.Invoke(latest);
 
             if (_settings.AutoInstallUpdates && !userInitiated)
@@ -150,7 +153,7 @@ public sealed class UpdateService : IDisposable
                 WorkingDirectory = Path.GetDirectoryName(path)!
             };
             Process.Start(info);
-            SetState(UpdateState.Installing, $"Installing InputBridge {Latest?.Version.ToString(3)}… The app will restart.");
+            SetState(UpdateState.Installing, $"Installing InputBridge {Latest?.Version}… The app will restart.");
             InstallerLaunched?.Invoke();
             return true;
         }
@@ -169,7 +172,23 @@ public sealed class UpdateService : IDisposable
 
     private async Task<UpdateInfo?> FetchLatestAsync(CancellationToken token)
     {
-        var url = $"https://api.github.com/repos/{Owner}/{Repository}/releases/latest";
+        if (!_settings.ReceiveBetaUpdates)
+        {
+            var latest = await GetJsonAsync<GitHubRelease>($"https://api.github.com/repos/{Owner}/{Repository}/releases/latest", token);
+            return latest is null || latest.Prerelease ? null : ToUpdateInfo(latest);
+        }
+
+        // Beta channel: newest version among recent published releases, pre-releases included.
+        var releases = await GetJsonAsync<List<GitHubRelease>>($"https://api.github.com/repos/{Owner}/{Repository}/releases?per_page=30", token) ?? [];
+        return releases
+            .Select(ToUpdateInfo)
+            .OfType<UpdateInfo>()
+            .OrderByDescending(info => info.Version)
+            .FirstOrDefault();
+    }
+
+    private async Task<T?> GetJsonAsync<T>(string url, CancellationToken token) where T : class
+    {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
@@ -180,10 +199,14 @@ public sealed class UpdateService : IDisposable
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(token);
-        var release = await JsonSerializer.DeserializeAsync<GitHubRelease>(stream, cancellationToken: token)
+        return await JsonSerializer.DeserializeAsync<T>(stream, cancellationToken: token)
             ?? throw new InvalidOperationException("Empty response from GitHub.");
-        if (release.Draft || release.Prerelease) return null;
-        if (!TryParseVersion(release.TagName, out var version)) return null;
+    }
+
+    private static UpdateInfo? ToUpdateInfo(GitHubRelease release)
+    {
+        if (release.Draft) return null;
+        if (!SemVer.TryParse(release.TagName, out var version)) return null;
 
         var asset = release.Assets.FirstOrDefault(a => string.Equals(a.Name, WindowsAssetName, StringComparison.OrdinalIgnoreCase));
         if (asset is null) return null;
@@ -248,7 +271,7 @@ public sealed class UpdateService : IDisposable
             if (!Directory.Exists(_downloadDirectory)) return;
             foreach (var dir in Directory.GetDirectories(_downloadDirectory))
             {
-                if (TryParseVersion(Path.GetFileName(dir), out var v) && v <= CurrentVersion)
+                if (SemVer.TryParse(Path.GetFileName(dir), out var v) && v <= CurrentVersion)
                     Directory.Delete(dir, recursive: true);
             }
         }
@@ -265,20 +288,14 @@ public sealed class UpdateService : IDisposable
         Changed?.Invoke();
     }
 
-    public static bool TryParseVersion(string? raw, out Version version)
+    /// <summary>Reads the full version (including a -beta suffix) stamped by the release build.</summary>
+    private static SemVer ReadCurrentVersion()
     {
-        version = new Version(0, 0, 0, 0);
-        if (string.IsNullOrWhiteSpace(raw)) return false;
-        var text = raw.Trim().TrimStart('v', 'V');
-        var cut = text.IndexOfAny(['-', '+']);
-        if (cut >= 0) text = text[..cut];
-        if (!Version.TryParse(text, out var parsed)) return false;
-        version = Normalize(parsed);
-        return true;
+        var assembly = Assembly.GetEntryAssembly();
+        var informational = assembly?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (SemVer.TryParse(informational, out var version)) return version;
+        return SemVer.TryParse(assembly?.GetName().Version?.ToString(), out version) ? version : SemVer.Zero;
     }
-
-    private static Version Normalize(Version v) =>
-        new(Math.Max(v.Major, 0), Math.Max(v.Minor, 0), Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
 
     public void Dispose()
     {

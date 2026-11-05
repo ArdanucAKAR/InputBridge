@@ -89,7 +89,7 @@ public partial class App : System.Windows.Application
         {
             _badgedTrayIcon ??= AppIcons.CreateBadgedIcon(_trayIcon);
             _tray.Icon = _badgedTrayIcon;
-            _tray.Text = $"InputBridge — update {updates.Latest?.Version.ToString(3)} available";
+            _tray.Text = $"InputBridge — update {updates.Latest?.Version} available";
             _updateMenuItem.Font = new System.Drawing.Font(_updateMenuItem.Font, System.Drawing.FontStyle.Bold);
             _updateMenuItem.ForeColor = System.Drawing.Color.FromArgb(234, 88, 12);
         }
@@ -102,7 +102,7 @@ public partial class App : System.Windows.Application
         }
         _updateMenuItem.Text = updates.State switch
         {
-            UpdateState.ReadyToInstall => $"●  Install update {updates.Latest?.Version.ToString(3)} and restart",
+            UpdateState.ReadyToInstall => $"●  Install update {updates.Latest?.Version} and restart",
             UpdateState.Checking => "Checking for updates…",
             UpdateState.Downloading => "Downloading update…",
             UpdateState.Installing => "Installing update…",
@@ -116,7 +116,7 @@ public partial class App : System.Windows.Application
         if (Runtime.Settings.AutoInstallUpdates) return;
         _tray?.ShowBalloonTip(
             10000,
-            $"InputBridge {info.Version.ToString(3)} is available",
+            $"InputBridge {info.Version} is available",
             "Click to review and install. InputBridge restarts after the update.",
             Forms.ToolTipIcon.Info);
     }

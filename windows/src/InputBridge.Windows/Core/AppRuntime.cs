@@ -36,11 +36,14 @@ public sealed class AppRuntime
         SetStatus($"Ready. Waiting for paired Macs on HTTP {Settings.HttpPort}.");
     }
 
-    public void SaveUpdateSettings(bool autoCheck, bool autoInstall)
+    public void SaveUpdateSettings(bool autoCheck, bool autoInstall, bool beta)
     {
+        var channelChanged = Settings.ReceiveBetaUpdates != beta;
         Settings.AutoCheckUpdates = autoCheck;
         Settings.AutoInstallUpdates = autoInstall;
+        Settings.ReceiveBetaUpdates = beta;
         _store.Save(Settings);
+        if (channelChanged) _ = Updates.CheckAsync(userInitiated: true);
     }
 
     public async Task StopAsync()

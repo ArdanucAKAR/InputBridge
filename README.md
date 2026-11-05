@@ -75,7 +75,7 @@ Both apps check `https://api.github.com/repos/ArdanucAKAR/InputBridge/releases/l
 - **Windows** — the tray menu and *Updates* tab offer *Install and restart*. The Inno Setup installer runs silently (one UAC prompt), then relaunches InputBridge in the background.
 - **macOS** — the menu bar and setup window offer *Install update and restart*. InputBridge quits, a helper swaps the app bundle in place and relaunches it. If the app is not in a writable folder (for example, it runs from the DMG), the DMG opens for a manual drag-and-drop.
 
-Automatic install is opt-in in both apps; automatic checking can be turned off. Drafts and pre-releases are ignored. Local development builds report version `0.0.0` and skip automatic checks. The updater relies on the asset names `InputBridge-Windows-Setup.exe` and `InputBridge-macOS.dmg`, so keep them unchanged.
+Automatic install is opt-in in both apps; automatic checking can be turned off. Drafts are ignored, and pre-releases (tags such as `v0.3.0-beta.1`) are offered only when **Receive beta versions** is enabled. Beta builds turn that option on by default. Local development builds report version `0.0.0` and skip automatic checks. The updater relies on the asset names `InputBridge-Windows-Setup.exe` and `InputBridge-macOS.dmg`, so keep them unchanged.
 
 ## Security
 

@@ -17,6 +17,14 @@ public sealed class AppSettings
     public string CameraDeviceId { get; set; } = "";
     public bool AutoCheckUpdates { get; set; } = true;
     public bool AutoInstallUpdates { get; set; }
+    /// <summary>Null until the user chooses; then defaults to true only on beta builds.</summary>
+    public bool? BetaUpdatesChoice { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool ReceiveBetaUpdates
+    {
+        get => BetaUpdatesChoice ?? UpdateService.IsRunningPrerelease;
+        set => BetaUpdatesChoice = value;
+    }
 }
 
 public sealed class MonitorProfileSetting

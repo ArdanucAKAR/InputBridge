@@ -102,7 +102,7 @@ macOS DMG, Apple Developer ID ile imzalanıp notarize edilmezse Gatekeeper uyar�
 - **Windows:** Tray menüsünde ve *Updates* sekmesinde *Install and restart* çıkar. Installer sessiz kurulur (bir kez UAC onayı ister), ardından InputBridge arka planda yeniden açılır.
 - **macOS:** Menü çubuğunda ve kurulum penceresinde *Install update and restart* çıkar. Uygulama kapanır, yardımcı script `.app` paketini yerinde değiştirir ve uygulamayı yeniden açar. Uygulama yazılabilir bir klasörde değilse (örneğin DMG içinden çalışıyorsa) DMG açılır, sürükle-bırak ile güncellersin.
 
-Otomatik kurulum iki uygulamada da isteğe bağlıdır; otomatik kontrol kapatılabilir. Draft ve pre-release'ler yok sayılır. Yerel geliştirme build'leri `0.0.0` sürümünü raporlar ve otomatik kontrol yapmaz.
+Otomatik kurulum iki uygulamada da isteğe bağlıdır; otomatik kontrol kapatılabilir. Draft'lar yok sayılır. Pre-release'ler (`v0.3.0-beta.1` gibi tag'ler) yalnızca **Receive beta versions** açıksa önerilir; beta build'lerde bu seçenek varsayılan olarak açıktır. Yerel geliştirme build'leri `0.0.0` sürümünü raporlar ve otomatik kontrol yapmaz.
 
 ## Bilinen sınırlar
 

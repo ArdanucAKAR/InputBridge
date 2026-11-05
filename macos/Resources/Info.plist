@@ -10,6 +10,7 @@
   <key>CFBundleIconName</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
   <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
+  <key>InputBridgeVersion</key><string>$(INPUTBRIDGE_VERSION)</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>NSBluetoothAlwaysUsageDescription</key><string>InputBridge uses Bluetooth to detect configured keyboards and switch configured BLE accessories.</string>

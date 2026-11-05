@@ -6,6 +6,8 @@
 - Redesigned Windows controller window: sidebar navigation, card layout, toggle switches and an update banner.
 - Redesigned macOS menu bar panel and settings window (sidebar + grouped forms).
 - When an update is ready, the tray icon (Windows) and menu bar icon (macOS) show an orange "!" badge; Windows also badges the taskbar button.
+- Beta channel: "Receive beta versions" offers GitHub pre-releases (tags like `v0.3.0-beta.1`) in both apps; versions compare by SemVer so betas update to later betas and to the final release.
+- Tags with a suffix are published as GitHub pre-releases.
 
 - Windows and macOS apps check GitHub Releases for new versions, download the installer in the background, verify its SHA-256 digest and install it on request (or automatically when enabled).
 - Windows installer restarts InputBridge after silent (in-app) updates and no longer duplicates firewall rules on reinstall.

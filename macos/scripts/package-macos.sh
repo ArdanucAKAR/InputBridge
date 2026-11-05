@@ -21,6 +21,7 @@ xcodebuild \
   -configuration Release \
   -derivedDataPath "$BUILD" \
   MARKETING_VERSION="$MARKETING_VERSION" \
+  INPUTBRIDGE_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="1" \
   CODE_SIGNING_ALLOWED=NO \
   build

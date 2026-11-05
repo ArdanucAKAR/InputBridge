@@ -258,6 +258,12 @@
                             Content="Check for updates automatically (every 6 hours)"/>
                   <CheckBox x:Name="AutoInstallUpdates" Style="{StaticResource ToggleSwitch}" Click="UpdateSettings_Click" Margin="0,14,0,0"
                             Content="Install updates automatically (Windows asks for administrator approval)"/>
+                  <CheckBox x:Name="BetaUpdates" Style="{StaticResource ToggleSwitch}" Click="UpdateSettings_Click" Margin="0,14,0,0">
+                    <StackPanel>
+                      <TextBlock Text="Receive beta versions"/>
+                      <TextBlock Style="{StaticResource Caption}" Text="Also offers pre-releases (for example 0.3.0-beta.1). Betas may be less stable."/>
+                    </StackPanel>
+                  </CheckBox>
                 </StackPanel>
               </Border>
             </StackPanel>

@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         _runtime.Updates.Changed += RefreshUpdates;
         AutoCheckUpdates.IsChecked = _runtime.Settings.AutoCheckUpdates;
         AutoInstallUpdates.IsChecked = _runtime.Settings.AutoInstallUpdates;
+        BetaUpdates.IsChecked = _runtime.Settings.ReceiveBetaUpdates;
         RefreshUpdates();
         RefreshMonitors();
         RefreshPairings();
@@ -119,7 +120,7 @@ public partial class MainWindow : Window
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(RefreshUpdates); return; }
         var updates = _runtime.Updates;
-        var version = updates.IsDevelopmentBuild ? "development build" : updates.CurrentVersion.ToString(3);
+        var version = updates.IsDevelopmentBuild ? "development build" : updates.CurrentVersion.ToString();
         CurrentVersionText.Text = $"InputBridge {version}";
         SidebarVersionText.Text = $"Version {version}";
         UpdateStatusText.Text = updates.StatusText;
@@ -131,7 +132,7 @@ public partial class MainWindow : Window
         var ready = updates.State == UpdateState.ReadyToInstall;
         UpdateBanner.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
         UpdatesNavBadge.Visibility = ready ? Visibility.Visible : Visibility.Collapsed;
-        UpdateBannerTitle.Text = $"InputBridge {updates.Latest?.Version.ToString(3)} is ready to install";
+        UpdateBannerTitle.Text = $"InputBridge {updates.Latest?.Version} is ready to install";
         Taskbar.Overlay = ready ? (_overlay ??= AppIcons.CreateTaskbarOverlay()) : null;
         Taskbar.Description = ready ? "InputBridge — update available" : "InputBridge";
     }
@@ -142,7 +143,7 @@ public partial class MainWindow : Window
 
     private void UpdateSettings_Click(object sender, RoutedEventArgs e)
     {
-        _runtime.SaveUpdateSettings(AutoCheckUpdates.IsChecked == true, AutoInstallUpdates.IsChecked == true);
+        _runtime.SaveUpdateSettings(AutoCheckUpdates.IsChecked == true, AutoInstallUpdates.IsChecked == true, BetaUpdates.IsChecked == true);
     }
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
