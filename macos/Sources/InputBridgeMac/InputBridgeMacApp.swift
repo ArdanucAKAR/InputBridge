@@ -503,7 +503,14 @@ private struct CameraPane: View {
                 }
                 HStack {
                     Spacer()
-                    Button("Install camera extension") { installer.activate() }
+                    switch installer.state {
+                    case .installed, .activating:
+                        EmptyView()
+                    case .needsApproval:
+                        Button("Open System Settings") { installer.openApprovalSettings() }
+                    default:
+                        Button("Install camera extension") { installer.activate() }
+                    }
                 }
             } header: {
                 Text("InputBridge Camera")

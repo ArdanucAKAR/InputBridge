@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- The Windows camera turns on only while an app on the Mac (Zoom, Meet, FaceTime…) uses InputBridge Camera, and turns off a few seconds after; switching to the Mac profile no longer lights it up.
+- New `InputBridge-macOS.pkg` installer: installs into Applications and opens InputBridge. The DMG is still published for the in-app updater.
+- When macOS waits for approval of InputBridge Camera, a setup window opens the right System Settings page with one click.
+- Camera sharing is on by default for new Windows installs.
+- Release builds are signed with Developer ID, notarized and stapled when the signing secrets are configured.
+
 ## 0.2.7
 
 - Windows and Mac profiles now also switch a G915/G913 keyboard between LIGHTSPEED (Windows) and Bluetooth (Mac) using HID++ CHANGE_HOST. The PC switches it to the Mac through its receiver; the Mac switches it back over Bluetooth, including when the Windows profile is chosen on the PC.

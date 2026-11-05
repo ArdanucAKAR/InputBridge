@@ -29,6 +29,7 @@ final class AppModel: ObservableObject {
     let cameraExtension = CameraExtensionInstaller()
     let updates = UpdateManager()
     private let cameraStream = CameraStreamClient()
+    private let cameraSetup = CameraSetupWindowController()
     private var cameraUsage: VirtualCameraUsageMonitor?
     private var cameraRetry: Task<Void, Never>?
     private var monitor: G915Monitor?
@@ -39,7 +40,15 @@ final class AppModel: ObservableObject {
     init() {
         discovery.start()
         restartKeyboardMonitor()
-        cameraExtension.activate()
+        cameraExtension.onNeedsApproval = { [weak self] in
+            Task { @MainActor in
+                guard let self, self.cameraShareEnabled else { return }
+                self.cameraSetup.show(installer: self.cameraExtension)
+            }
+        }
+        if cameraShareEnabled {
+            cameraExtension.activate()
+        }
         cameraStream.onEnded = { [weak self] in
             Task { @MainActor in self?.cameraStreamEnded() }
         }
@@ -116,6 +125,7 @@ final class AppModel: ObservableObject {
         restartKeyboardMonitor()
         updateKeyboardPolling(keyboardOnMac: currentMode == .mac)
         refreshCameraStream()
+        setUpCameraIfNeeded()
         status = "Device settings saved."
     }
 
@@ -221,6 +231,19 @@ final class AppModel: ObservableObject {
             Task { @MainActor in await self?.detected(mode) }
         }
         monitor?.start()
+    }
+
+    /// Turning camera sharing on installs the extension, or brings back the approval window.
+    func setUpCameraIfNeeded() {
+        guard cameraShareEnabled else { return }
+        switch cameraExtension.state {
+        case .installed, .activating, .needsRestart:
+            break
+        case .needsApproval:
+            cameraSetup.show(installer: cameraExtension)
+        case .notInstalled, .failed:
+            cameraExtension.activate()
+        }
     }
 
     /// The Windows camera is pulled only while the Mac profile is applied *and* an app on this Mac is
