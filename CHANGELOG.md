@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.7
 
 - Windows and Mac profiles now also switch a G915/G913 keyboard between LIGHTSPEED (Windows) and Bluetooth (Mac) using HID++ CHANGE_HOST. The PC switches it to the Mac through its receiver; the Mac switches it back over Bluetooth, including when the Windows profile is chosen on the PC.
 - New Keyboard page on Windows (enable, name pattern, detect) and a keyboard option in the Mac's Devices settings.
