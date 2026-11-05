@@ -64,7 +64,7 @@ Secret'lar GitHub Actions Secrets içinde şifreli durur; repo public olsa da g�
 1. **Certificates** → **Developer ID Application** ve **Developer ID Installer** sertifikalarını oluştur. Keychain Access'te **ikisini birlikte seçip** private key'leriyle tek bir `.p12` olarak dışa aktar ("2 öğeyi dışa aktar") ve bir şifre ver. Installer sertifikası `.pkg` yükleyicisini imzalar; eksikse `.pkg` imzasız kalır ve notarize edilmez.
 2. **Identifiers** → iki App ID oluştur:
    - `com.inputbridge.mac`: **System Extension** yeteneği açık.
-   - `com.inputbridge.mac.camera`: **App Groups** açık, grup `TEAMID.com.inputbridge.mac.camera` (macOS'ta Team ID önekli gruplar Developer ID ile çalışır).
+   - `com.inputbridge.mac.camera`: **App Groups** açık. Portalda bir grup kaydetmek gerekmez; uzantının kullandığı `TEAMID.com.inputbridge.mac.camera` grubu Team ID önekli olduğu için macOS'ta kayıtsız çalışır (portal yalnızca `group.` ile başlayan grupları kaydeder).
 3. **Profiles** → her App ID için **Developer ID** türünde bir provisioning profile oluştur ve indir.
 4. [App Store Connect](https://appstoreconnect.apple.com/access/integrations/api) → **Integrations** → **Team Keys** → **Developer** rolüyle bir API anahtarı oluştur. `.p8` dosyasını indir (yalnızca bir kez indirilebilir), Key ID ve Issuer ID'yi not et.
 
