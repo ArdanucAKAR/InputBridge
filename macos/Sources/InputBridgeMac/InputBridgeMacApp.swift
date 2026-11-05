@@ -442,6 +442,14 @@ private struct DevicesPane: View {
             }
 
             Section {
+                Toggle("Switch the keyboard with the profile", isOn: $model.keyboardSwitchEnabled)
+            } header: {
+                Text("Keyboard connection")
+            } footer: {
+                Text("Mac profile: the Windows PC moves the keyboard to Bluetooth. Windows profile: this Mac sends it back to LIGHTSPEED. macOS may ask to allow InputBridge under Privacy & Security → Input Monitoring.")
+            }
+
+            Section {
                 Toggle("Switch Logitech Z407 source", isOn: $model.z407Enabled)
                 LabeledContent("Speaker status") {
                     Text(z407.status).foregroundStyle(.secondary)

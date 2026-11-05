@@ -23,6 +23,8 @@ public partial class MainWindow : Window
         AutoCheckUpdates.IsChecked = _runtime.Settings.AutoCheckUpdates;
         AutoInstallUpdates.IsChecked = _runtime.Settings.AutoInstallUpdates;
         BetaUpdates.IsChecked = _runtime.Settings.ReceiveBetaUpdates;
+        KeyboardSwitchEnabled.IsChecked = _runtime.Settings.KeyboardSwitchEnabled;
+        KeyboardNamePattern.Text = _runtime.Settings.KeyboardNamePattern;
         RefreshUpdates();
         RefreshMonitors();
         RefreshPairings();
@@ -139,7 +141,44 @@ public partial class MainWindow : Window
 
     private System.Windows.Media.ImageSource? _overlay;
 
+    public const int UpdatesPage = 4;
+
     public void ShowPage(int index) => NavList.SelectedIndex = index;
+
+    private async void DetectKeyboard_Click(object sender, RoutedEventArgs e)
+    {
+        DetectKeyboardButton.IsEnabled = false;
+        KeyboardStatusText.Text = "Looking for the keyboard on the LIGHTSPEED receiver…";
+        try
+        {
+            var keyboard = await _runtime.DetectKeyboardAsync();
+            KeyboardStatusText.Text = keyboard is null
+                ? "No matching keyboard is connected through a receiver on this PC. If it is in Bluetooth mode, it is connected to the Mac."
+                : $"{keyboard.Name} is connected to this PC over LIGHTSPEED (host {keyboard.CurrentHost + 1} of {keyboard.HostCount}).";
+        }
+        catch (Exception ex)
+        {
+            KeyboardStatusText.Text = $"Keyboard detection failed: {ex.Message}";
+        }
+        finally
+        {
+            DetectKeyboardButton.IsEnabled = true;
+        }
+    }
+
+    private void SaveKeyboard_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _runtime.SaveKeyboardSettings(KeyboardSwitchEnabled.IsChecked == true, KeyboardNamePattern.Text);
+            KeyboardNamePattern.Text = _runtime.Settings.KeyboardNamePattern;
+            KeyboardStatusText.Text = "Keyboard setup saved.";
+        }
+        catch (ArgumentException)
+        {
+            WpfMessageBox.Show("The keyboard name is not a valid regular expression.", "InputBridge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
     private void UpdateSettings_Click(object sender, RoutedEventArgs e)
     {

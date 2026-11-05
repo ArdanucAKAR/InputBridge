@@ -5,6 +5,9 @@ namespace InputBridge.Windows;
 
 public enum ProfileMode { Windows, Mac }
 
+/// <summary>Where a profile request came from: this PC's UI/tray, or the paired Mac over the API.</summary>
+public enum ProfileSource { Local, Remote }
+
 public sealed class AppSettings
 {
     public Guid ControllerId { get; set; } = Guid.NewGuid();
@@ -15,6 +18,8 @@ public sealed class AppSettings
     public List<TrustedClient> TrustedClients { get; set; } = [];
     public bool CameraShareEnabled { get; set; }
     public string CameraDeviceId { get; set; } = "";
+    public bool KeyboardSwitchEnabled { get; set; } = true;
+    public string KeyboardNamePattern { get; set; } = "G915|G913";
     public bool AutoCheckUpdates { get; set; } = true;
     public bool AutoInstallUpdates { get; set; }
     /// <summary>Null until the user chooses; then defaults to true only on beta builds.</summary>

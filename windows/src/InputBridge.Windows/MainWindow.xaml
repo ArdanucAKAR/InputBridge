@@ -43,6 +43,12 @@
           </ListBoxItem>
           <ListBoxItem>
             <StackPanel Orientation="Horizontal">
+              <TextBlock Style="{StaticResource Glyph}" Text="&#xE765;" Margin="0,0,12,0"/>
+              <TextBlock Text="Keyboard"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
+            <StackPanel Orientation="Horizontal">
               <TextBlock Style="{StaticResource Glyph}" Text="&#xE722;" Margin="0,0,12,0"/>
               <TextBlock Text="Camera"/>
             </StackPanel>
@@ -169,6 +175,41 @@
               </DockPanel>
             </Border>
           </DockPanel>
+        </TabItem>
+
+        <!-- Keyboard -->
+        <TabItem>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <TextBlock Text="Keyboard" Style="{StaticResource PageTitle}"/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="Profiles also move a two-host Logitech keyboard (G915/G913) between this PC's LIGHTSPEED receiver and the Mac's Bluetooth."/>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <CheckBox x:Name="KeyboardSwitchEnabled" Style="{StaticResource ToggleSwitch}" Content="Switch the keyboard with the profile"/>
+                  <TextBlock Text="Keyboard name" Style="{StaticResource Caption}" Margin="0,20,0,6"/>
+                  <TextBox x:Name="KeyboardNamePattern" MinWidth="320" MaxWidth="460" HorizontalAlignment="Left" Padding="8,6"/>
+                  <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0" Text="Regular expression matched against the keyboard name reported by the receiver."/>
+                  <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                    <Button x:Name="DetectKeyboardButton" Margin="0,0,8,0" Click="DetectKeyboard_Click">
+                      <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Glyph}" FontSize="13" Text="&#xE721;" Margin="0,0,8,0"/>
+                        <TextBlock Text="Detect keyboard"/>
+                      </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource PrimaryButton}" Click="SaveKeyboard_Click">Save keyboard setup</Button>
+                  </StackPanel>
+                  <TextBlock x:Name="KeyboardStatusText" Style="{StaticResource Caption}" Margin="0,14,0,0"/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="How it works" Style="{StaticResource CardTitle}"/>
+                  <TextBlock Style="{StaticResource Caption}" Margin="0,6,0,0"
+                             Text="Mac profile: this PC tells the keyboard, through its receiver, to switch to Bluetooth. Windows profile: the keyboard is on the Mac's Bluetooth, so the Mac sends it back to LIGHTSPEED. Requires the Mac companion to be paired and running."/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
         </TabItem>
 
         <!-- Camera -->

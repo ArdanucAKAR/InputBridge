@@ -45,6 +45,28 @@ Content-Type: application/json
 
 The Windows controller applies configured monitor actions and, when camera share is enabled, starts or stops the USB camera publisher. The Mac companion applies local BLE actions before it calls this endpoint.
 
+## Keyboard host switching
+
+Profiles also move a two-host Logitech keyboard (G915/G913) with HID++ 2.0 `CHANGE_HOST` (0x1814):
+
+- **Mac profile:** the Windows controller sends `setCurrentHost` to the keyboard through its LIGHTSPEED receiver, moving it to Bluetooth.
+- **Windows profile requested by the Mac:** the Mac sends `setCurrentHost` over the keyboard's Bluetooth HID++ collection (usage page `0xFF43`, usage `0x0202`).
+- **Windows profile chosen on the PC:** the PC cannot reach a keyboard that is on the Mac's Bluetooth, so it stores a request for 15 seconds. While the keyboard is connected to it, the Mac polls:
+
+`POST /api/keyboard/claim`
+
+```http
+Authorization: Bearer <pairing-token>
+```
+
+```json
+{"ok":true,"target":"windows"}
+```
+
+`target` is `null` when nothing is pending. Claiming clears the request; the Mac then applies the Windows profile, which switches the keyboard back to LIGHTSPEED.
+
+A profile requested by the Mac within 20 seconds of the same profile being applied is not applied again, so the keyboard's own connect/disconnect after a switch does not repeat the monitor commands.
+
 ## Camera share
 
 `GET /api/camera/status`

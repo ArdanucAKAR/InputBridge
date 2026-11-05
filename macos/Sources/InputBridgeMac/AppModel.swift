@@ -13,6 +13,7 @@ final class AppModel: ObservableObject {
     @Published var keyboardPattern = UserDefaults.standard.string(forKey: "keyboard-name-pattern") ?? "G915|G913"
     @Published var z407Enabled = UserDefaults.standard.object(forKey: "z407-enabled") as? Bool ?? true
     @Published var cameraShareEnabled = UserDefaults.standard.object(forKey: "camera-share-enabled") as? Bool ?? true
+    @Published var keyboardSwitchEnabled = UserDefaults.standard.object(forKey: "keyboard-switch-enabled") as? Bool ?? true
     @Published var manualHost = UserDefaults.standard.string(forKey: "manual-controller-host") ?? ""
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
     /// Mirrors `updates.state` so the menu bar label (driven by this model) can show the update badge.
@@ -25,6 +26,9 @@ final class AppModel: ObservableObject {
     let updates = UpdateManager()
     private let cameraStream = CameraStreamClient()
     private var monitor: G915Monitor?
+    /// Last profile applied, so the keyboard's own connect/disconnect after a switch does not re-apply it.
+    private var lastApplied: (mode: ProfileMode, at: Date)?
+    private var keyboardPoll: Task<Void, Never>?
 
     init() {
         discovery.start()
@@ -91,7 +95,9 @@ final class AppModel: ObservableObject {
         UserDefaults.standard.set(pattern, forKey: "keyboard-name-pattern")
         UserDefaults.standard.set(z407Enabled, forKey: "z407-enabled")
         UserDefaults.standard.set(cameraShareEnabled, forKey: "camera-share-enabled")
+        UserDefaults.standard.set(keyboardSwitchEnabled, forKey: "keyboard-switch-enabled")
         restartKeyboardMonitor()
+        updateKeyboardPolling(keyboardOnMac: currentMode == .mac)
         status = "Device settings saved."
     }
 
@@ -109,6 +115,10 @@ final class AppModel: ObservableObject {
 
     func detected(_ mode: ProfileMode) async {
         currentMode = mode
+        updateKeyboardPolling(keyboardOnMac: mode == .mac)
+        if let last = lastApplied, last.mode == mode, Date().timeIntervalSince(last.at) < 20 {
+            return // the keyboard moved because InputBridge just applied this profile
+        }
         guard automationEnabled else {
             status = "Automation paused. Detected \(mode.title)."
             return
@@ -131,13 +141,60 @@ final class AppModel: ObservableObject {
             }
             try await controller.apply(mode, offer: offer)
             currentMode = mode
+            lastApplied = (mode, Date())
             updateCameraStream(mode, offer: offer)
-            if let z407Note {
-                status = "\(mode.title) profile applied. Z407: \(z407Note)"
-            } else {
-                status = "\(mode.title) profile applied."
+
+            // Mac profile: Windows moves the keyboard off its receiver. Windows profile: only this Mac can
+            // reach the keyboard while it is on Bluetooth.
+            var keyboardNote: String?
+            if mode == .windows && keyboardSwitchEnabled {
+                keyboardNote = await switchKeyboardToWindows()
+            }
+
+            var notes = ["\(mode.title) profile applied."]
+            if let z407Note { notes.append("Z407: \(z407Note)") }
+            if let keyboardNote { notes.append(keyboardNote) }
+            status = notes.joined(separator: " ")
+        }
+    }
+
+    private func switchKeyboardToWindows() async -> String? {
+        let pattern = keyboardPattern
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let regex = try NSRegularExpression(pattern: pattern, options: [.caseInsensitive])
+                    let name = try LogitechBluetoothKeyboard.switchAwayFromBluetooth(namePattern: regex)
+                    continuation.resume(returning: name == nil ? nil : "Keyboard switched to LIGHTSPEED.")
+                } catch {
+                    continuation.resume(returning: "Keyboard: \(error.localizedDescription)")
+                }
             }
         }
+    }
+
+    /// While the keyboard is on this Mac's Bluetooth, the Windows PC cannot reach it. Poll the controller
+    /// so a Windows profile chosen on the PC can still bring the keyboard back.
+    private func updateKeyboardPolling(keyboardOnMac: Bool) {
+        guard keyboardOnMac, keyboardSwitchEnabled else {
+            keyboardPoll?.cancel()
+            keyboardPoll = nil
+            return
+        }
+        guard keyboardPoll == nil else { return }
+        keyboardPoll = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard let self, !Task.isCancelled else { return }
+                await self.pollKeyboardRequest()
+            }
+        }
+    }
+
+    private func pollKeyboardRequest() async {
+        guard !busy, controller.hasToken, let offer = selectedOffer else { return }
+        guard let target = try? await controller.claimKeyboardRequest(offer: offer), target == .windows else { return }
+        await apply(.windows)
     }
 
     private func restartKeyboardMonitor() {

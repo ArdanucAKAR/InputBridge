@@ -66,8 +66,18 @@ public sealed class ControllerServer : IAsyncDisposable
             if (!Enum.TryParse<ProfileMode>(mode, true, out var profile))
                 return Results.BadRequest(new { ok = false, error = "invalid-mode" });
 
-            var results = await _runtime.ApplyProfileAsync(profile);
+            var results = await _runtime.ApplyProfileAsync(profile, ProfileSource.Remote);
             return Results.Ok(new { ok = true, mode = profile.ToString().ToLowerInvariant(), monitors = results });
+        });
+
+        // The Mac polls this while the keyboard is on its Bluetooth link, so a Windows profile chosen
+        // on this PC can ask the Mac to send the keyboard back to LIGHTSPEED.
+        _app.MapPost("/api/keyboard/claim", (HttpContext ctx) =>
+        {
+            if (!NetworkPolicy.IsPrivateOrLoopback(ctx.Connection.RemoteIpAddress)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (!TryAuthorize(ctx, _runtime.PairingService)) return Results.Unauthorized();
+            var target = _runtime.ClaimKeyboardRequest();
+            return Results.Ok(new { ok = true, target = target?.ToString().ToLowerInvariant() });
         });
 
         _app.MapGet("/api/camera/status", (HttpContext ctx) =>

@@ -57,7 +57,7 @@ public partial class App : System.Windows.Application
         _tray.BalloonTipClicked += (_, _) =>
         {
             ShowMainWindow();
-            _window?.ShowPage(3);
+            _window?.ShowPage(InputBridge.Windows.MainWindow.UpdatesPage);
         };
 
         Runtime.Updates.Changed += () => Dispatcher.BeginInvoke(RefreshUpdateMenu);

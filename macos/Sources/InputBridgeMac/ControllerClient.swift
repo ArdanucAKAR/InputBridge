@@ -104,6 +104,21 @@ final class ControllerClient {
         remember(offer)
     }
 
+    /// Returns (and clears) a keyboard request left by the Windows controller, e.g. a Windows profile chosen on the PC.
+    func claimKeyboardRequest(offer: ControllerOffer) async throws -> ProfileMode? {
+        guard let token = keychain.read(tokenAccount) else { throw ClientError.notPaired }
+        var request = URLRequest(url: offer.baseURL.appendingPathComponent("api/keyboard/claim"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 5
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, http.statusCode == 404 { return nil } // older controller
+        try assertHTTP(response)
+        struct Claim: Decodable { let target: String? }
+        let claim = try JSONDecoder().decode(Claim.self, from: data)
+        return claim.target.flatMap { ProfileMode(rawValue: $0) }
+    }
+
     private func save(_ controller: StoredController) {
         guard let data = try? JSONEncoder().encode(controller) else { return }
         defaults.set(data, forKey: controllerKey)

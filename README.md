@@ -28,6 +28,7 @@ InputBridge uses local multicast discovery and a one-time, user-approved pairing
 | Trigger | Logitech G915/G913 Bluetooth connected/disconnected |
 | BLE action | Logitech Z407 Bluetooth/AUX source switching |
 | Display action | DDC/CI VCP `0x60` input switching |
+| Keyboard action | G915/G913 LIGHTSPEED ↔ Bluetooth host switching (HID++ CHANGE_HOST) |
 | Camera share | Windows USB webcam → Mac virtual camera (signed macOS build) |
 
 See [README_TR.md](README_TR.md) for the Turkish setup guide and [docs/RELEASING_TR.md](docs/RELEASING_TR.md) for release instructions.
