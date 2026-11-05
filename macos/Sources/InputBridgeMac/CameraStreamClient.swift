@@ -1,18 +1,25 @@
 import Foundation
 
+/// Receives the Windows camera stream and hands frames to the camera extension.
+/// All public methods and callbacks run on the main queue.
 final class CameraStreamClient: NSObject, URLSessionDataDelegate {
     private var session: URLSession?
     private var task: URLSessionDataTask?
     private var buffer = Data()
     private let queue = DispatchQueue(label: "com.inputbridge.camera.client")
 
+    /// Called when a stream that was not stopped by `stop()` ends: the connection dropped,
+    /// Windows refused it, or Windows stopped the camera.
+    var onEnded: (() -> Void)?
+
+    var isActive: Bool { task != nil }
+
     func start(url: URL, token: String) {
         stop()
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 3600
+        config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 86400
-        config.waitsForConnectivity = true
-        let session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        let session = URLSession(configuration: config, delegate: self, delegateQueue: .main)
         self.session = session
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -27,7 +34,10 @@ final class CameraStreamClient: NSObject, URLSessionDataDelegate {
         task = nil
         session?.invalidateAndCancel()
         session = nil
-        queue.sync { buffer.removeAll(keepingCapacity: true) }
+        queue.sync {
+            buffer.removeAll(keepingCapacity: true)
+            CameraFrameStore.clear()
+        }
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
@@ -39,9 +49,21 @@ final class CameraStreamClient: NSObject, URLSessionDataDelegate {
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        guard dataTask === task else { return }
         queue.async { [weak self] in
             self?.append(data)
         }
+    }
+
+    func urlSession(_ session: URLSession, task finished: URLSessionTask, didCompleteWithError error: Error?) {
+        guard finished === task else { return } // a stream we stopped ourselves
+        task = nil
+        self.session?.finishTasksAndInvalidate()
+        self.session = nil
+        queue.async {
+            CameraFrameStore.clear()
+        }
+        onEnded?()
     }
 
     private func append(_ data: Data) {

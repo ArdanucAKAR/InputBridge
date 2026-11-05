@@ -12,6 +12,7 @@ public sealed class AppRuntime
     private static readonly TimeSpan DuplicateWindow = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan KeyboardRequestLifetime = TimeSpan.FromSeconds(15);
     private DiscoveryResponder? _discovery;
+    private ProfileMode? _cameraProfile;
     private int _stopped;
 
     public AppSettings Settings { get; }
@@ -108,9 +109,12 @@ public sealed class AppRuntime
 
     public void SaveCameraSettings(bool enabled, string deviceId)
     {
+        var changed = Settings.CameraShareEnabled != enabled || Settings.CameraDeviceId != deviceId;
         Settings.CameraShareEnabled = enabled;
         Settings.CameraDeviceId = deviceId;
         _store.Save(Settings);
+        // Drop a running stream so it stops (share off) or reopens with the newly selected camera.
+        if (changed) _ = _camera.StopAsync();
         SetStatus(enabled ? "Camera share enabled." : "Camera share disabled.");
     }
 
@@ -205,14 +209,24 @@ public sealed class AppRuntime
         return new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
+    /// <summary>
+    /// The camera is not opened here: the Mac pulls it through <see cref="OpenCameraStreamAsync"/> only
+    /// while an app on the Mac uses InputBridge Camera. Switching to Windows releases it for local apps.
+    /// </summary>
     private async Task ApplyCameraAsync(ProfileMode profile)
     {
-        if (profile == ProfileMode.Mac && Settings.CameraShareEnabled)
-        {
-            await _camera.StartAsync(Settings.CameraDeviceId);
-            return;
-        }
-        await _camera.StopAsync();
+        _cameraProfile = profile;
+        if (profile != ProfileMode.Mac) await _camera.StopAsync();
+    }
+
+    /// <summary>
+    /// Opens the camera for one Mac stream, or returns null while sharing is off or this PC has the
+    /// Windows profile. A null profile (controller restarted since the last switch) is allowed.
+    /// </summary>
+    public async Task<CameraCaptureService.CameraLease?> OpenCameraStreamAsync()
+    {
+        if (!Settings.CameraShareEnabled || _cameraProfile == ProfileMode.Windows) return null;
+        return await _camera.AcquireAsync(Settings.CameraDeviceId);
     }
 
     private void SetStatus(string value)

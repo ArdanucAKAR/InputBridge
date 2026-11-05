@@ -217,7 +217,7 @@
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel>
               <TextBlock Text="Camera" Style="{StaticResource PageTitle}"/>
-              <TextBlock Style="{StaticResource PageSubtitle}" Text="Share a USB camera attached to this PC with the paired Mac. The camera stays plugged into Windows and streams only while the Mac profile is active."/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="Share a USB camera attached to this PC with the paired Mac. The camera stays plugged into Windows. While the Mac profile is active it turns on only when an app on the Mac uses InputBridge Camera, and turns off again a few seconds after."/>
               <Border Style="{StaticResource Card}">
                 <StackPanel>
                   <CheckBox x:Name="CameraShareEnabled" Style="{StaticResource ToggleSwitch}" Content="Share camera with the Mac"/>

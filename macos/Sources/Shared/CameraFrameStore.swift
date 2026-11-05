@@ -1,5 +1,12 @@
 import Foundation
 
+enum InputBridgeCameraDevice {
+    /// Fixed so the app can find the device and video apps remember it as the selected camera.
+    static let deviceID = UUID(uuidString: "6F0C4E2A-8B1D-4C55-9A4E-2B7D3E1F5A90")!
+    static let streamID = UUID(uuidString: "0D3B8F61-5C2E-4A7B-8E19-7A4C6D2B9E13")!
+    static let name = "InputBridge Camera"
+}
+
 /// Hands camera frames from the app to the camera extension through files.
 ///
 /// The extension runs as the `_cmiodalassistants` user, so an app group container would resolve to a

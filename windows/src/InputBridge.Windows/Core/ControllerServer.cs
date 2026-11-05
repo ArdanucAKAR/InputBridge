@@ -105,18 +105,46 @@ public sealed class ControllerServer : IAsyncDisposable
                 ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
-            if (!_runtime.Settings.CameraShareEnabled || !_runtime.Camera.IsStreaming)
+
+            // The camera turns on with the first stream and off a few seconds after the last one ends.
+            CameraCaptureService.CameraLease? lease;
+            try
+            {
+                lease = await _runtime.OpenCameraStreamAsync();
+            }
+            catch (Exception ex)
+            {
+                ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                await ctx.Response.WriteAsJsonAsync(new { ok = false, error = "camera-error", message = ex.Message });
+                return;
+            }
+            if (lease is null)
             {
                 ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                 await ctx.Response.WriteAsJsonAsync(new { ok = false, error = "camera-unavailable" });
                 return;
             }
 
-            ctx.Response.ContentType = "application/octet-stream";
-            ctx.Response.Headers["Cache-Control"] = "no-store";
-            ctx.Response.Headers["X-InputBridge-Camera"] = "jpeg-framed-v1";
-            await ctx.Response.StartAsync();
-            await _runtime.Camera.WriteStreamAsync(ctx.Response.Body, ctx.RequestAborted);
+            await using (lease)
+            {
+                using var stop = CancellationTokenSource.CreateLinkedTokenSource(ctx.RequestAborted, lease.Stopped);
+                ctx.Response.ContentType = "application/octet-stream";
+                ctx.Response.Headers["Cache-Control"] = "no-store";
+                ctx.Response.Headers["X-InputBridge-Camera"] = "jpeg-framed-v1";
+                await ctx.Response.StartAsync();
+                try
+                {
+                    await _runtime.Camera.WriteStreamAsync(ctx.Response.Body, stop.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // The Mac disconnected or the camera was stopped; end the response normally.
+                }
+                catch (System.IO.IOException)
+                {
+                    // The connection dropped mid-frame.
+                }
+            }
         });
 
         await _app.StartAsync();

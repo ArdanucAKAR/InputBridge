@@ -35,7 +35,12 @@ final class InputBridgeDeviceSource: NSObject, CMIOExtensionDeviceSource {
     override init() {
         streamSource = InputBridgeStreamSource()
         super.init()
-        device = CMIOExtensionDevice(localizedName: "InputBridge Camera", deviceID: UUID(), legacyDeviceID: nil, source: self)
+        device = CMIOExtensionDevice(
+            localizedName: InputBridgeCameraDevice.name,
+            deviceID: InputBridgeCameraDevice.deviceID,
+            legacyDeviceID: nil,
+            source: self
+        )
         try? device.addStream(streamSource.stream)
     }
 
@@ -76,8 +81,8 @@ final class InputBridgeStreamSource: NSObject, CMIOExtensionStreamSource {
         super.init()
         latest = black
         stream = CMIOExtensionStream(
-            localizedName: "InputBridge Camera",
-            streamID: UUID(),
+            localizedName: InputBridgeCameraDevice.name,
+            streamID: InputBridgeCameraDevice.streamID,
             direction: .source,
             clockType: .hostTime,
             source: self
@@ -122,14 +127,23 @@ final class InputBridgeStreamSource: NSObject, CMIOExtensionStreamSource {
     func stopStream() throws {
         timer?.cancel()
         timer = nil
+        // The next session starts black until the Windows camera delivers a fresh frame.
+        latest = black
+        lastSeq = nil
     }
 
     private func publish() {
+        // The app starts the Windows camera only once a client starts this stream (see
+        // VirtualCameraUsageMonitor), so the first frames are black while the camera warms up.
         if let frame = CameraFrameStore.read() {
             if frame.seq != lastSeq, let buffer = JPEGDecoder.pixelBuffer(from: frame.jpeg) {
                 lastSeq = frame.seq
                 latest = buffer
             }
+        } else {
+            // The app removed the frame because the camera stopped; do not freeze on the last picture.
+            latest = black
+            lastSeq = nil
         }
         guard let pixelBuffer = latest else { return }
         let hostTime = CMClockGetTime(CMClockGetHostTimeClock())

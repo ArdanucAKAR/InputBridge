@@ -43,7 +43,7 @@ Authorization: Bearer <pairing-token>
 Content-Type: application/json
 ```
 
-The Windows controller applies configured monitor actions and, when camera share is enabled, starts or stops the USB camera publisher. The Mac companion applies local BLE actions before it calls this endpoint.
+The Windows controller applies configured monitor actions and, for the `windows` profile, releases the USB camera. The Mac companion applies local BLE actions before it calls this endpoint.
 
 ## Keyboard host switching
 
@@ -85,7 +85,7 @@ Authorization: Bearer <pairing-token>
 Authorization: Bearer <pairing-token>
 ```
 
-Private-network only. Returns `503` when share is disabled or the Mac profile has not started capture.
+Private-network only. Returns `503` when share is disabled, the `windows` profile is active, or the camera cannot be opened (`error: camera-error`).
 
 Body is an `application/octet-stream` of length-prefixed JPEG frames (`X-InputBridge-Camera: jpeg-framed-v1`):
 
@@ -93,4 +93,6 @@ Body is an `application/octet-stream` of length-prefixed JPEG frames (`X-InputBr
 uint32 big-endian length | JPEG bytes | uint32 length | JPEG bytes | ...
 ```
 
-Applying `mac` starts capture of the configured Windows USB camera at 1080p. Applying `windows` stops capture so local Windows apps can use the camera again.
+The camera is opened on demand: the first `stream` request starts capture of the configured Windows USB camera at 1080p, and capture stops 3 seconds after the last stream closes. Applying `mac` does not turn the camera on. Applying `windows` stops capture, ends open streams, and refuses new ones so local Windows apps can use the camera again.
+
+The Mac companion opens the stream only while the Mac profile is applied and some app on the Mac is streaming from InputBridge Camera (`kCMIODevicePropertyDeviceIsRunningSomewhere`), and closes it when that app stops. It retries every 3 seconds if the stream drops while the camera is still in use.

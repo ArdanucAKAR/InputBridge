@@ -481,7 +481,18 @@ private struct CameraPane: View {
             Section {
                 Toggle("Use the Windows camera on this Mac", isOn: $model.cameraShareEnabled)
             } footer: {
-                Text("While the Mac profile is active, the USB camera attached to Windows streams to “InputBridge Camera”. The camera stays plugged into Windows.")
+                Text("While the Mac profile is active, the USB camera attached to Windows streams to “InputBridge Camera”. The camera stays plugged into Windows and turns on only while an app on this Mac uses “InputBridge Camera”.")
+            }
+
+            Section {
+                LabeledContent("Windows camera") {
+                    Text(model.cameraStreaming ? "On — streaming to this Mac" : "Off")
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("In use on this Mac") {
+                    Text(model.cameraInUse ? "Yes" : "No")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {
