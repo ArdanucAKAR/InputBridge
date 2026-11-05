@@ -1,7 +1,8 @@
 #!/bin/zsh
 set -euo pipefail
 
-# Builds InputBridge.app and InputBridge-macOS.dmg.
+# Builds InputBridge.app, InputBridge-macOS.pkg (installer for new users) and InputBridge-macOS.dmg
+# (used by the in-app updater of installed copies).
 #
 # Without signing variables the build is ad-hoc signed: fine for local testing, but the camera
 # extension cannot be activated and Gatekeeper warns on other Macs.
@@ -11,6 +12,8 @@ set -euo pipefail
 #   MACOS_APP_PROFILE      Developer ID provisioning profile (name or UUID) for com.inputbridge.mac
 #   MACOS_CAMERA_PROFILE   Developer ID provisioning profile (name or UUID) for com.inputbridge.mac.camera
 #   MACOS_SIGN_IDENTITY    Optional, defaults to "Developer ID Application"
+# The .pkg is signed with the team's "Developer ID Installer" identity when it is in the keychain
+# (override with MACOS_INSTALLER_IDENTITY); without it the .pkg is left unsigned.
 #
 # Notarization (optional, requires signing). Either an App Store Connect API key:
 #   NOTARY_KEY_PATH, NOTARY_KEY_ID, NOTARY_ISSUER_ID
@@ -25,6 +28,7 @@ VERSION="${INPUTBRIDGE_VERSION:-0.2.0}"
 MARKETING_VERSION="${VERSION%%-*}"
 PROJECT="$ROOT/InputBridgeMac.xcodeproj"
 DMG="$DIST/InputBridge-macOS.dmg"
+PKG="$DIST/InputBridge-macOS.pkg"
 
 TEAM_ID="${MACOS_TEAM_ID:-}"
 SIGN_IDENTITY="${MACOS_SIGN_IDENTITY:-Developer ID Application}"
@@ -109,21 +113,72 @@ if [[ "$SIGNED" == true ]]; then
   codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
 fi
 
-if [[ "$NOTARIZE" == true ]]; then
-  xcrun notarytool submit "$DMG" "${NOTARY_AUTH[@]}" --wait --timeout 30m --output-format json \
-    | tee "$BUILD/notary.json"
-  NOTARY_STATUS=$(plutil -extract status raw "$BUILD/notary.json" 2>/dev/null || echo unknown)
-  if [[ "$NOTARY_STATUS" != "Accepted" ]]; then
-    NOTARY_ID=$(plutil -extract id raw "$BUILD/notary.json" 2>/dev/null || echo "")
-    [[ -n "$NOTARY_ID" ]] && xcrun notarytool log "$NOTARY_ID" "${NOTARY_AUTH[@]}" || true
-    echo "Notarization failed with status: $NOTARY_STATUS" >&2
+# Installer package: always installs into /Applications, then opens InputBridge (scripts/postinstall).
+PKG_ROOT="$BUILD/pkgroot"
+COMPONENT_PLIST="$BUILD/component.plist"
+COMPONENT_PKG="$BUILD/InputBridge-component.pkg"
+rm -rf "$PKG_ROOT"
+mkdir -p "$PKG_ROOT"
+ditto "$APP" "$PKG_ROOT/InputBridge.app"
+pkgbuild --analyze --root "$PKG_ROOT" "$COMPONENT_PLIST"
+# Without this, Installer "upgrades" any other copy with the same bundle ID it finds on disk
+# (Downloads, a build folder…) instead of installing into /Applications.
+COMPONENTS=$(plutil -extract . raw "$COMPONENT_PLIST" 2>/dev/null || echo 1)
+for (( i = 0; i < COMPONENTS; i++ )); do
+  plutil -replace "$i.BundleIsRelocatable" -bool NO "$COMPONENT_PLIST"
+done
+pkgbuild \
+  --root "$PKG_ROOT" \
+  --component-plist "$COMPONENT_PLIST" \
+  --install-location /Applications \
+  --scripts "$ROOT/installer/scripts" \
+  --identifier com.inputbridge.mac.pkg \
+  --version "$MARKETING_VERSION" \
+  "$COMPONENT_PKG"
+
+INSTALLER_IDENTITY="${MACOS_INSTALLER_IDENTITY:-}"
+if [[ -z "$INSTALLER_IDENTITY" && "$SIGNED" == true ]]; then
+  # SHA-1 of this team's Developer ID Installer identity, if the keychain has one.
+  INSTALLER_IDENTITY=$(security find-identity -v | grep "Developer ID Installer" | grep "($TEAM_ID)" \
+    | head -1 | awk '{print $2}' || true)
+fi
+PKG_SIGNED=false
+if [[ -n "$INSTALLER_IDENTITY" ]]; then
+  productbuild --package "$COMPONENT_PKG" --sign "$INSTALLER_IDENTITY" --timestamp "$PKG"
+  PKG_SIGNED=true
+else
+  [[ "$SIGNED" == true ]] && echo "No Developer ID Installer identity found: the .pkg is unsigned." >&2
+  productbuild --package "$COMPONENT_PKG" "$PKG"
+fi
+
+notarize() {
+  local file="$1" result="$BUILD/notary-${1:t}.json"
+  xcrun notarytool submit "$file" "${NOTARY_AUTH[@]}" --wait --timeout 30m --output-format json | tee "$result"
+  local notary_status
+  notary_status=$(plutil -extract status raw "$result" 2>/dev/null || echo unknown)
+  if [[ "$notary_status" != "Accepted" ]]; then
+    local notary_id
+    notary_id=$(plutil -extract id raw "$result" 2>/dev/null || echo "")
+    [[ -n "$notary_id" ]] && xcrun notarytool log "$notary_id" "${NOTARY_AUTH[@]}" || true
+    echo "Notarization of ${file:t} failed with status: $notary_status" >&2
     exit 1
   fi
-  xcrun stapler staple "$DMG"
-  xcrun stapler validate "$DMG"
+  xcrun stapler staple "$file"
+  xcrun stapler validate "$file"
+}
+
+if [[ "$NOTARIZE" == true ]]; then
+  notarize "$DMG"
   spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG"
+  if [[ "$PKG_SIGNED" == true ]]; then
+    notarize "$PKG"
+    spctl --assess --type install --verbose=2 "$PKG"
+  else
+    echo "The .pkg is unsigned, so it was not notarized." >&2
+  fi
 elif [[ "$SIGNED" == true ]]; then
   echo "Signed but not notarized: Gatekeeper will still block the download on other Macs."
 fi
 
+echo "Created $PKG"
 echo "Created $DMG"

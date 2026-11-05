@@ -60,14 +60,15 @@ Requires macOS 13+ and Xcode 15+.
 A version tag triggers GitHub Actions to build:
 
 - `InputBridge-Windows-Setup.exe`
-- `InputBridge-macOS.dmg`
+- `InputBridge-macOS.pkg` (installer for new users)
+- `InputBridge-macOS.dmg` (used by the in-app updater)
 
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Without signing secrets the macOS build is ad-hoc signed and meant for testing; the camera extension needs a Developer ID signed build. When the signing and notarization secrets are configured (see [docs/RELEASING_TR.md](docs/RELEASING_TR.md)), the workflow signs, notarizes and staples the DMG.
+Without signing secrets the macOS build is ad-hoc signed and meant for testing; the camera extension needs a Developer ID signed build. When the signing and notarization secrets are configured (see [docs/RELEASING_TR.md](docs/RELEASING_TR.md)), the workflow signs, notarizes and staples the installer package and the DMG.
 
 ### Automatic updates
 

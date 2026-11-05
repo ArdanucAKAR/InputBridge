@@ -152,7 +152,9 @@ jobs:
         with:
           name: InputBridge-macOS
           if-no-files-found: error
-          path: macos/dist/InputBridge-macOS.dmg
+          path: |
+            macos/dist/InputBridge-macOS.pkg
+            macos/dist/InputBridge-macOS.dmg
 
   release:
     if: needs.metadata.outputs.should_release == 'true'
@@ -179,11 +181,13 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               artifacts/InputBridge-Windows/InputBridge-Windows-Setup.exe \
+              artifacts/InputBridge-macOS/InputBridge-macOS.pkg \
               artifacts/InputBridge-macOS/InputBridge-macOS.dmg \
               --clobber
           else
             gh release create "$TAG" \
               artifacts/InputBridge-Windows/InputBridge-Windows-Setup.exe \
+              artifacts/InputBridge-macOS/InputBridge-macOS.pkg \
               artifacts/InputBridge-macOS/InputBridge-macOS.dmg \
               --title "InputBridge ${TAG}" \
               --generate-notes \

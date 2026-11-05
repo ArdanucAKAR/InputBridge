@@ -29,7 +29,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-GitHub Actions workflow'u Windows installer ve unsigned macOS DMG üretir; tag release sayfasına ekler.
+GitHub Actions workflow'u Windows installer'ı, macOS `.pkg` yükleyicisini ve macOS DMG'yi üretir; tag release sayfasına ekler.
 
 ## Uygulama içi otomatik güncelleme
 
@@ -39,7 +39,7 @@ Kurulu uygulamalar `releases/latest` uç noktasını okur. Bir release'in kullan
 - Release **draft veya pre-release olmamalı**. Test sürümlerini pre-release işaretlersen kullanıcılara gitmez.
 - Test sürümü için tag'e ek koy: `v0.3.0-beta.1`. Workflow bunu otomatik **pre-release** olarak yayınlar. Kararlı kanaldaki kullanıcılar görmez; uygulamada **Receive beta versions** açık olanlar (ve beta build'i kuranlar) güncelleme olarak alır.
 - Sürüm sıralaması SemVer'e göredir: `0.3.0-beta.1` < `0.3.0-beta.2` < `0.3.0-rc.1` < `0.3.0`. Beta kullanıcıları final `v0.3.0` çıktığında ona da güncellenir.
-- Asset adları değişmemeli: `InputBridge-Windows-Setup.exe` ve `InputBridge-macOS.dmg`.
+- Asset adları değişmemeli: `InputBridge-Windows-Setup.exe` ve `InputBridge-macOS.dmg`. Kurulu Mac uygulamaları güncellemeyi DMG'den alır; yeni kullanıcılar için `InputBridge-macOS.pkg` yayınlanır.
 - Uygulama indirilen dosyayı GitHub'ın asset için verdiği SHA-256 digest ile doğrular. Asset'i sonradan yeniden yüklemek (`gh release upload --clobber`) sorun değildir; GitHub yeni digest üretir.
 
 Uygulamalar 45 saniye sonra ve her 6 saatte bir kontrol eder; anında denemek için Windows'ta tray → *Check for updates*, Mac'te menü → *Check for updates*.
@@ -55,13 +55,13 @@ Bu açık kaynak deposunda sertifikayı veya private key'i asla commit etme.
 
 ## macOS signing ve notarization
 
-Secret'lar GitHub Actions Secrets içinde şifreli durur; repo public olsa da görünmez, loglarda maskelenir ve fork'lardan gelen PR'lara verilmez. Secret'lar tanımlı değilse workflow eskisi gibi ad-hoc imzalı (test amaçlı) DMG üretir.
+Secret'lar GitHub Actions Secrets içinde şifreli durur; repo public olsa da görünmez, loglarda maskelenir ve fork'lardan gelen PR'lara verilmez. Secret'lar tanımlı değilse workflow eskisi gibi ad-hoc imzalı (test amaçlı) DMG ve imzasız `.pkg` üretir.
 
-İmzasız build'de **InputBridge Camera uzantısı yüklenmez**; sanal kamera için Developer ID imzası gerekir. İndirilen DMG'nin Gatekeeper uyarısı olmadan açılması için ayrıca notarization gerekir.
+İmzasız build'de **InputBridge Camera uzantısı yüklenmez**; sanal kamera için Developer ID imzası gerekir. İndirilen `.pkg` ve DMG'nin Gatekeeper uyarısı olmadan açılması için ayrıca notarization gerekir.
 
 ### 1. Apple Developer hesabında bir kez yapılacaklar
 
-1. **Certificates** → **Developer ID Application** sertifikası oluştur. Keychain Access'te sertifikayı private key'iyle birlikte `.p12` olarak dışa aktar ve bir şifre ver.
+1. **Certificates** → **Developer ID Application** ve **Developer ID Installer** sertifikalarını oluştur. Keychain Access'te **ikisini birlikte seçip** private key'leriyle tek bir `.p12` olarak dışa aktar ("2 öğeyi dışa aktar") ve bir şifre ver. Installer sertifikası `.pkg` yükleyicisini imzalar; eksikse `.pkg` imzasız kalır ve notarize edilmez.
 2. **Identifiers** → iki App ID oluştur:
    - `com.inputbridge.mac`: **System Extension** yeteneği açık.
    - `com.inputbridge.mac.camera`: **App Groups** açık, grup `TEAMID.com.inputbridge.mac.camera` (macOS'ta Team ID önekli gruplar Developer ID ile çalışır).
@@ -85,7 +85,11 @@ Secret'lar GitHub Actions Secrets içinde şifreli durur; repo public olsa da g�
 
 Bu dosyaları (`.p12`, `.p8`, `.provisionprofile`) repoya **asla** commit etme; `.gitignore` ilk üçünü zaten dışarıda tutar, `.p8`'i diskte repo dışında sakla. Sertifika sızarsa Apple Developer portalından hemen iptal et.
 
-Workflow sertifikayı geçici bir keychain'e yükler, uygulamayı ve uzantıyı hardened runtime ile imzalar, DMG'yi imzalar, `notarytool` ile Apple'a gönderir, onaylanınca ticket'ı DMG'ye `stapler` ile ekler ve iş bitince keychain'i siler.
+Workflow sertifikaları geçici bir keychain'e yükler, uygulamayı ve uzantıyı hardened runtime ile imzalar, DMG'yi ve `.pkg`'yi imzalar, ikisini de `notarytool` ile Apple'a gönderir, onaylanınca ticket'ları `stapler` ile ekler ve iş bitince keychain'i siler.
+
+### Kullanıcı deneyimi
+
+`InputBridge-macOS.pkg` uygulamayı her zaman `/Applications` klasörüne kurar (aynı bundle ID'li başka bir kopya bulsa bile), kurulum bitince InputBridge'i açar ve uygulamanın sahipliğini oturumdaki kullanıcıya verir; böylece uygulama içi güncelleme şifre istemeden çalışır. InputBridge ilk açılışta kamera uzantısını ister; macOS onay beklerse **Set up InputBridge Camera** penceresi çıkar ve tek butonla doğru Sistem Ayarları sayfasını açar. Windows'ta kamera paylaşımı yeni kurulumlarda varsayılan olarak açıktır.
 
 ### Yerelde imzalı build
 
@@ -112,5 +116,6 @@ Kamera uzantısı yalnızca uygulama `/Applications` içindeyken etkinleşir. İ
 - [ ] İmzalı Mac build'de InputBridge Camera Sistem Ayarları'nda izinleniyor ve Zoom/Meet listesinde görünüyor.
 - [ ] Mac profiline geçince Windows kamerasının ışığı **yanmıyor**; Mac'te Zoom/Meet/FaceTime InputBridge Camera'yı açınca yanıyor ve görüntü geliyor; uygulama kamerayı bırakınca birkaç saniye içinde sönüyor.
 - [ ] Windows profilinde kamera yine yerel Windows'a dönüyor.
+- [ ] İndirilen `.pkg` başka bir Mac'te uyarısız kuruluyor, InputBridge'i kendisi açıyor ve kamera kurulum penceresi çıkıyor
 - [ ] İndirilen DMG başka bir Mac'te Gatekeeper uyarısı olmadan açılıyor (`spctl -a -vv /Applications/InputBridge.app` → `source=Notarized Developer ID`).
 - [ ] Mac login item ve Windows startup davranışı test edildi.

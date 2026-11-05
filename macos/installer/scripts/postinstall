@@ -1,0 +1,18 @@
+#!/bin/sh
+# $3 is the volume InputBridge was installed on.
+APP="$3/Applications/InputBridge.app"
+[ -d "$APP" ] || exit 0
+
+USER_NAME=$(/usr/bin/stat -f%Su /dev/console)
+case "$USER_NAME" in ""|root|loginwindow|_mbsetupuser) exit 0 ;; esac
+
+# Same ownership as an app dragged into Applications, so the in-app updater can replace it later
+# without asking for an administrator password.
+/usr/sbin/chown -R "$USER_NAME" "$APP"
+
+# Start InputBridge for the logged-in user; it then walks them through enabling the camera.
+if [ "$3" = "/" ]; then
+  USER_ID=$(/usr/bin/id -u "$USER_NAME")
+  /bin/launchctl asuser "$USER_ID" /usr/bin/sudo -u "$USER_NAME" /usr/bin/open "$APP"
+fi
+exit 0
