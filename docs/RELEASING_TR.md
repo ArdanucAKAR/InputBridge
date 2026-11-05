@@ -37,6 +37,7 @@ Kurulu uygulamalar `releases/latest` uç noktasını okur. Bir release'in kullan
 
 - Tag `vX.Y.Z` biçiminde olmalı ve bir önceki sürümden büyük olmalı (`v0.2.10` > `v0.2.9`).
 - Release **draft veya pre-release olmamalı**. Test sürümlerini pre-release işaretlersen kullanıcılara gitmez.
+- Test sürümü için tag'e ek koy: `v0.3.0-beta.1`. Workflow bunu otomatik **pre-release** olarak yayınlar; Releases sayfasından indirilebilir ama güncelleyici görmez.
 - Asset adları değişmemeli: `InputBridge-Windows-Setup.exe` ve `InputBridge-macOS.dmg`.
 - Uygulama indirilen dosyayı GitHub'ın asset için verdiği SHA-256 digest ile doğrular. Asset'i sonradan yeniden yüklemek (`gh release upload --clobber`) sorun değildir; GitHub yeni digest üretir.
 

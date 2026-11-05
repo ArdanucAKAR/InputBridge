@@ -5,6 +5,8 @@ ROOT="${0:A:h:h}"
 DIST="$ROOT/dist"
 BUILD="$ROOT/.build"
 VERSION="${INPUTBRIDGE_VERSION:-0.2.0}"
+# CFBundleShortVersionString must be numeric; drop a pre-release suffix such as -beta.1.
+MARKETING_VERSION="${VERSION%%-*}"
 PROJECT="$ROOT/InputBridgeMac.xcodeproj"
 
 command -v xcodegen >/dev/null || { echo "XcodeGen is required. Install it with: brew install xcodegen" >&2; exit 1; }
@@ -18,7 +20,7 @@ xcodebuild \
   -scheme InputBridgeMac \
   -configuration Release \
   -derivedDataPath "$BUILD" \
-  MARKETING_VERSION="$VERSION" \
+  MARKETING_VERSION="$MARKETING_VERSION" \
   CURRENT_PROJECT_VERSION="1" \
   CODE_SIGNING_ALLOWED=NO \
   build

@@ -113,6 +113,12 @@ jobs:
         shell: bash
         run: |
           TAG="v${VERSION}"
+          # Versions with a suffix (0.3.0-beta.1) are published as pre-releases:
+          # downloadable from the Releases page, but ignored by the in-app updater.
+          EXTRA_FLAGS=()
+          if [[ "$VERSION" == *-* ]]; then
+            EXTRA_FLAGS+=(--prerelease)
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               artifacts/InputBridge-Windows/InputBridge-Windows-Setup.exe \
@@ -124,5 +130,6 @@ jobs:
               artifacts/InputBridge-macOS/InputBridge-macOS.dmg \
               --title "InputBridge ${TAG}" \
               --generate-notes \
-              --target "$GITHUB_SHA"
+              --target "$GITHUB_SHA" \
+              "${EXTRA_FLAGS[@]}"
           fi
