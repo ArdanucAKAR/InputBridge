@@ -177,6 +177,7 @@ jobs:
       - name: Build macOS application and DMG
         env:
           INPUTBRIDGE_VERSION: ${{ needs.metadata.outputs.version }}
+          INPUTBRIDGE_BUILD_NUMBER: ${{ github.run_number }}
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |

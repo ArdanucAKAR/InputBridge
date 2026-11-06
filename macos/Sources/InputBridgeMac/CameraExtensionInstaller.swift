@@ -74,8 +74,10 @@ final class CameraExtensionInstaller: NSObject, ObservableObject, OSSystemExtens
             setState(.failed, "Move InputBridge into the Applications folder, then open it again to install the camera.")
         case .requestCanceled, .requestSuperseded:
             setState(.notInstalled, "Camera extension is not installed.")
+        case .codeSignatureInvalid, .validationFailed, .forbiddenBySystemPolicy, .missingEntitlement:
+            setState(.failed, "Camera extension: \(error.localizedDescription) This needs a Developer ID signed and notarized build.")
         default:
-            setState(.failed, "Camera extension: \(error.localizedDescription). Signed builds are required.")
+            setState(.failed, "Camera extension: \(error.localizedDescription)")
         }
     }
 

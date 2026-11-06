@@ -9,12 +9,9 @@
   <array>
     <string>$(TeamIdentifierPrefix)com.inputbridge.mac.camera</string>
   </array>
-  <!-- The extension runs as the _cmiodalassistants user, so it cannot see the user's group container.
-       The app writes frames to /tmp instead (see CameraFrameStore). -->
-  <key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
-  <array>
-    <string>/tmp/com.inputbridge.camera/</string>
-    <string>/private/tmp/com.inputbridge.camera/</string>
-  </array>
+  <!-- The extension pulls frames from the paired Windows controller itself. File temporary-exception
+       entitlements are not an option: the camera extension's sandbox profile fails to compile with them. -->
+  <key>com.apple.security.network.client</key>
+  <true/>
 </dict>
 </plist>

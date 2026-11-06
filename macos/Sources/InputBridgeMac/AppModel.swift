@@ -18,8 +18,6 @@ final class AppModel: ObservableObject {
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
     /// An app on this Mac (Zoom, Meet, FaceTime…) is streaming from InputBridge Camera.
     @Published private(set) var cameraInUse = false
-    /// The Windows camera stream is connected.
-    @Published private(set) var cameraStreaming = false
     /// Mirrors `updates.state` so the menu bar label (driven by this model) can show the update badge.
     @Published private(set) var updateAvailable = false
 
@@ -28,10 +26,9 @@ final class AppModel: ObservableObject {
     let z407 = Z407Controller()
     let cameraExtension = CameraExtensionInstaller()
     let updates = UpdateManager()
-    private let cameraStream = CameraStreamClient()
     private let cameraSetup = CameraSetupWindowController()
     private var cameraUsage: VirtualCameraUsageMonitor?
-    private var cameraRetry: Task<Void, Never>?
+    private var cancellables = Set<AnyCancellable>()
     private var monitor: G915Monitor?
     /// Last profile applied, so the keyboard's own connect/disconnect after a switch does not re-apply it.
     private var lastApplied: (mode: ProfileMode, at: Date)?
@@ -49,16 +46,15 @@ final class AppModel: ObservableObject {
         if cameraShareEnabled {
             cameraExtension.activate()
         }
-        cameraStream.onEnded = { [weak self] in
-            Task { @MainActor in self?.cameraStreamEnded() }
-        }
         cameraUsage = VirtualCameraUsageMonitor { [weak self] inUse in
-            Task { @MainActor in
-                self?.cameraInUse = inUse
-                self?.refreshCameraStream()
-            }
+            Task { @MainActor in self?.cameraInUse = inUse }
         }
         cameraUsage?.start()
+        // The controller's address can change after discovery; keep the camera extension pointed at it.
+        discovery.$offers
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateCameraConfig() }
+            .store(in: &cancellables)
         updates.$state
             .map { $0 == .readyToInstall }
             .removeDuplicates()
@@ -70,7 +66,6 @@ final class AppModel: ObservableObject {
         discovery.stop()
         monitor?.stop()
         cameraUsage?.stop()
-        cameraStream.stop()
     }
 
     var selectedOffer: ControllerOffer? {
@@ -84,6 +79,7 @@ final class AppModel: ObservableObject {
             status = "Waiting for Windows approval…"
             try await controller.pair(with: offer)
             status = "Paired with \(offer.name)."
+            updateCameraConfig()
         }
     }
 
@@ -104,7 +100,7 @@ final class AppModel: ObservableObject {
 
     func forget() {
         controller.forget()
-        refreshCameraStream()
+        updateCameraConfig()
         status = "Pairing removed."
     }
 
@@ -124,7 +120,7 @@ final class AppModel: ObservableObject {
         UserDefaults.standard.set(keyboardSwitchEnabled, forKey: "keyboard-switch-enabled")
         restartKeyboardMonitor()
         updateKeyboardPolling(keyboardOnMac: currentMode == .mac)
-        refreshCameraStream()
+        updateCameraConfig()
         setUpCameraIfNeeded()
         status = "Device settings saved."
     }
@@ -170,7 +166,7 @@ final class AppModel: ObservableObject {
             try await controller.apply(mode, offer: offer)
             currentMode = mode
             lastApplied = (mode, Date())
-            refreshCameraStream()
+            updateCameraConfig()
 
             // Mac profile: Windows moves the keyboard off its receiver. Windows profile: only this Mac can
             // reach the keyboard while it is on Bluetooth.
@@ -246,35 +242,21 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// The Windows camera is pulled only while the Mac profile is applied *and* an app on this Mac is
-    /// using InputBridge Camera. Windows turns the camera on when the stream connects and off shortly
-    /// after it disconnects, so its light stays off until a call or recording actually starts.
-    private func refreshCameraStream() {
-        let wanted = lastApplied?.mode == .mac && cameraShareEnabled && cameraInUse
-        guard wanted, let offer = selectedOffer, let token = controller.pairingToken() else {
-            cameraRetry?.cancel()
-            cameraRetry = nil
-            if cameraStream.isActive { cameraStream.stop() }
-            cameraStreaming = false
+    /// Points the camera extension at the paired Windows controller while the Mac profile is applied.
+    /// The extension connects only while an app uses InputBridge Camera; Windows turns its camera on
+    /// when that stream connects and off a few seconds after it closes, so its light stays off until
+    /// a call or recording actually starts.
+    private func updateCameraConfig() {
+        guard lastApplied?.mode == .mac, cameraShareEnabled,
+              let offer = selectedOffer, let token = controller.pairingToken() else {
+            cameraUsage?.setConfig(.disabled)
             return
         }
-        guard !cameraStream.isActive else { return }
-        cameraRetry?.cancel()
-        cameraRetry = nil
-        cameraStream.start(url: controller.cameraStreamURL(offer: offer), token: token)
-        cameraStreaming = true
-    }
-
-    /// The stream dropped or Windows refused it while an app still needs the camera: try again shortly.
-    private func cameraStreamEnded() {
-        cameraStreaming = false
-        guard cameraRetry == nil else { return }
-        cameraRetry = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard !Task.isCancelled, let self else { return }
-            self.cameraRetry = nil
-            self.refreshCameraStream()
-        }
+        cameraUsage?.setConfig(CameraStreamConfig(
+            enabled: true,
+            url: controller.cameraStreamURL(offer: offer).absoluteString,
+            token: token
+        ))
     }
 
     private func run(_ action: @escaping () async throws -> Void) async {

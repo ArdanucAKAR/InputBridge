@@ -68,7 +68,8 @@ xcodegen generate --spec project.yml
 BUILD_SETTINGS=(
   MARKETING_VERSION="$MARKETING_VERSION"
   INPUTBRIDGE_VERSION="$VERSION"
-  CURRENT_PROJECT_VERSION="1"
+  # Must grow with every release: macOS only replaces an installed camera extension with a higher build.
+  CURRENT_PROJECT_VERSION="${INPUTBRIDGE_BUILD_NUMBER:-1}"
 )
 if [[ "$SIGNED" == true ]]; then
   BUILD_SETTINGS+=(
@@ -171,7 +172,8 @@ notarize() {
   local attempt
   for attempt in 1 2 3 4 5; do
     if xcrun stapler staple "$file"; then
-      xcrun stapler validate "$file"
+      # validate also talks to Apple and can hit the same network errors; the staple itself succeeded.
+      xcrun stapler validate "$file" || echo "::warning::Could not re-validate the stapled ${file:t} (network)."
       return 0
     fi
     [[ $attempt == 5 ]] && break

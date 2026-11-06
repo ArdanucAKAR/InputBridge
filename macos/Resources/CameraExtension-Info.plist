@@ -10,15 +10,14 @@
   <key>CFBundleShortVersionString</key><string>$(MARKETING_VERSION)</string>
   <key>CFBundleVersion</key><string>$(CURRENT_PROJECT_VERSION)</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSSystemExtensionUsageDescription</key>
+  <string>Shows the USB camera plugged into your paired Windows PC as “InputBridge Camera” in Zoom, Meet and FaceTime.</string>
+  <key>NSAppTransportSecurity</key>
+  <dict><key>NSAllowsLocalNetworking</key><true/></dict>
   <key>CMIOExtension</key>
   <dict>
     <key>CMIOExtensionMachServiceName</key>
     <string>$(TeamIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-  </dict>
-  <key>NSExtension</key>
-  <dict>
-    <key>NSExtensionPointIdentifier</key>
-    <string>com.apple.cmio-device</string>
   </dict>
 </dict>
 </plist>

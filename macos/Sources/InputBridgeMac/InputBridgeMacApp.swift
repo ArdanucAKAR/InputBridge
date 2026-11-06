@@ -485,12 +485,8 @@ private struct CameraPane: View {
             }
 
             Section {
-                LabeledContent("Windows camera") {
-                    Text(model.cameraStreaming ? "On — streaming to this Mac" : "Off")
-                        .foregroundStyle(.secondary)
-                }
                 LabeledContent("In use on this Mac") {
-                    Text(model.cameraInUse ? "Yes" : "No")
+                    Text(model.cameraInUse ? "Yes — the Windows camera is on" : "No — the Windows camera is off")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -501,21 +497,20 @@ private struct CameraPane: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.trailing)
                 }
-                HStack {
-                    Spacer()
-                    switch installer.state {
-                    case .installed, .activating:
-                        EmptyView()
-                    case .needsApproval:
-                        Button("Open System Settings") { installer.openApprovalSettings() }
-                    default:
-                        Button("Install camera extension") { installer.activate() }
+                if installer.state != .installed && installer.state != .activating {
+                    HStack {
+                        Spacer()
+                        if installer.state == .needsApproval {
+                            Button("Open System Settings") { installer.openApprovalSettings() }
+                        } else {
+                            Button("Install camera extension") { installer.activate() }
+                        }
                     }
                 }
             } header: {
                 Text("InputBridge Camera")
             } footer: {
-                Text("After installing, choose “InputBridge Camera” once in Zoom, Meet or FaceTime. Requires a signed build.")
+                Text("After installing, choose “InputBridge Camera” once in Zoom, Meet or FaceTime.")
             }
 
             Section {
