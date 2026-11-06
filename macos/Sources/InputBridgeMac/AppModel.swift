@@ -242,13 +242,13 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// Points the camera extension at the paired Windows controller while the Mac profile is applied.
-    /// The extension connects only while an app uses InputBridge Camera; Windows turns its camera on
-    /// when that stream connects and off a few seconds after it closes, so its light stays off until
-    /// a call or recording actually starts.
+    /// Points the camera extension at the paired Windows controller. The extension connects only while
+    /// an app uses InputBridge Camera; Windows turns its camera on when that stream connects and off a few
+    /// seconds after it closes, so its light stays off until a call or recording actually starts.
+    /// Windows itself refuses the stream while its own profile is active, so this does not depend on
+    /// which profile this app last applied (that is unknown after a restart).
     private func updateCameraConfig() {
-        guard lastApplied?.mode == .mac, cameraShareEnabled,
-              let offer = selectedOffer, let token = controller.pairingToken() else {
+        guard cameraShareEnabled, let offer = selectedOffer, let token = controller.pairingToken() else {
             cameraUsage?.setConfig(.disabled)
             return
         }
