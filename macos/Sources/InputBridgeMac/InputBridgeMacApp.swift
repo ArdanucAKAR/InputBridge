@@ -485,6 +485,14 @@ private struct CameraPane: View {
             }
 
             Section {
+                if model.cameraAccessDenied {
+                    LabeledContent("Camera access") {
+                        Button("Allow in System Settings…") { model.openCameraPrivacySettings() }
+                    }
+                    Text("macOS hides InputBridge Camera from InputBridge until it may use the camera. InputBridge never turns a camera on by itself. Quit and reopen InputBridge after allowing it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 LabeledContent("In use on this Mac") {
                     Text(model.cameraInUse ? "Yes — the Windows camera is on" : "No — the Windows camera is off")
                         .foregroundStyle(.secondary)

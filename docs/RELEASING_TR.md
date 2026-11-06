@@ -89,7 +89,7 @@ Workflow sertifikaları geçici bir keychain'e yükler, uygulamayı ve uzantıy�
 
 ### Kullanıcı deneyimi
 
-`InputBridge-macOS.pkg` uygulamayı her zaman `/Applications` klasörüne kurar (aynı bundle ID'li başka bir kopya bulsa bile), kurulum bitince InputBridge'i açar ve uygulamanın sahipliğini oturumdaki kullanıcıya verir; böylece uygulama içi güncelleme şifre istemeden çalışır. InputBridge ilk açılışta kamera uzantısını ister; macOS onay beklerse **Set up InputBridge Camera** penceresi çıkar ve tek butonla doğru Sistem Ayarları sayfasını açar. Windows'ta kamera paylaşımı yeni kurulumlarda varsayılan olarak açıktır.
+`InputBridge-macOS.pkg` uygulamayı her zaman `/Applications` klasörüne kurar (aynı bundle ID'li başka bir kopya bulsa bile), kurulum bitince InputBridge'i açar ve uygulamanın sahipliğini oturumdaki kullanıcıya verir; böylece uygulama içi güncelleme şifre istemeden çalışır. InputBridge ilk açılışta kamera erişimi ister (macOS, InputBridge Camera'yı ancak kamera izni olan uygulamalara gösterir; InputBridge hiçbir kamerayı kendisi açmaz) ve kamera uzantısını ister; macOS onay beklerse **Set up InputBridge Camera** penceresi çıkar ve tek butonla doğru Sistem Ayarları sayfasını açar. Windows'ta kamera paylaşımı yeni kurulumlarda varsayılan olarak açıktır.
 
 ### Yerelde imzalı build
 

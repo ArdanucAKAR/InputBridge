@@ -4,5 +4,9 @@
 <dict>
   <key>com.apple.developer.system-extension.install</key>
   <true/>
+  <!-- Hardened runtime: without it macOS hides camera devices from the app, so it cannot find
+       InputBridge Camera to hand it the Windows controller address. The app never opens a camera. -->
+  <key>com.apple.security.device.camera</key>
+  <true/>
 </dict>
 </plist>

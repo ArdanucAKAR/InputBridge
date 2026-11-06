@@ -7,6 +7,8 @@
 - New `InputBridge-macOS.pkg` installer: installs into Applications and opens InputBridge. The DMG is still published for the in-app updater.
 - When macOS waits for approval of InputBridge Camera, a setup window opens the right System Settings page with one click.
 - Camera sharing is on by default for new Windows installs.
+- Controllers show up under Discovered controllers again without Check address: the Windows responder now reads and writes the camelCase discovery messages, and the Mac also checks the paired and manually entered addresses over HTTP every 30 seconds.
+- macOS asks once for camera access: without it InputBridge cannot see InputBridge Camera to configure it. InputBridge never turns a camera on itself.
 - Release builds are signed with Developer ID, notarized and stapled when the signing secrets are configured.
 
 ## 0.2.7

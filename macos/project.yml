@@ -46,6 +46,7 @@ targets:
       - sdk: SystemExtensions.framework
       - sdk: CryptoKit.framework
       - sdk: CoreMediaIO.framework
+      - sdk: AVFoundation.framework
       - target: InputBridgeCamera
         embed: true
         codeSign: true

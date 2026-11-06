@@ -7,6 +7,13 @@ namespace InputBridge.Windows;
 
 public sealed class DiscoveryResponder : IAsyncDisposable
 {
+    /// <summary>
+    /// The wire format is camelCase (see shared/PROTOCOL.md). The default serializer options are
+    /// case-sensitive PascalCase, which silently dropped every Mac request and would have produced
+    /// an offer the Mac cannot read.
+    /// </summary>
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
     private readonly AppSettings _settings;
     private UdpClient? _udp;
     private CancellationTokenSource? _cts;
@@ -33,10 +40,10 @@ public sealed class DiscoveryResponder : IAsyncDisposable
             try
             {
                 var received = await _udp.ReceiveAsync(cancellationToken);
-                var request = JsonSerializer.Deserialize<DiscoveryRequest>(received.Buffer);
+                var request = JsonSerializer.Deserialize<DiscoveryRequest>(received.Buffer, Json);
                 if (request?.Protocol != 1 || request.Type != "discover" || string.IsNullOrWhiteSpace(request.Nonce)) continue;
                 var offer = new DiscoveryOffer(1, "offer", request.Nonce, _settings.ControllerId, Environment.MachineName, _settings.HttpPort);
-                var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(offer));
+                var bytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(offer, Json));
                 await _udp.SendAsync(bytes, received.RemoteEndPoint, cancellationToken);
             }
             catch (OperationCanceledException) { break; }

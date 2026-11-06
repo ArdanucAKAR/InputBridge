@@ -40,7 +40,7 @@ Mac uygulaması Windows Controller'ı multicast discovery ile bulur. Windows'un 
    - `0x0F`: DisplayPort 1
    - `0x11`: HDMI 1
    - `0x12`: HDMI 2
-4. Mac'te `InputBridge-macOS.pkg` dosyasını açıp kur. Yükleyici uygulamayı `/Applications` klasörüne koyar ve açar; kamera için çıkan pencerede **Open System Settings** ile uzantıyı bir kez onayla.
+4. Mac'te `InputBridge-macOS.pkg` dosyasını açıp kur. Yükleyici uygulamayı `/Applications` klasörüne koyar ve açar; kamera erişimi sorusuna **İzin Ver** de ve kamera için çıkan pencerede **Open System Settings** ile uzantıyı bir kez onayla.
 5. Mac uygulamasını aç, otomatik bulunan Windows Controller için **Pair** düğmesine bas.
 6. Windows uygulamasında pairing isteğini onayla.
 7. Mac uygulamasında Bluetooth izni ver; Z407 ve G915/G913 bağlı/pair edilmiş olsun.

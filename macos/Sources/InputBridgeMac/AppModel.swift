@@ -1,3 +1,4 @@
+import AVFoundation
 import Combine
 import Foundation
 import SwiftUI
@@ -18,6 +19,8 @@ final class AppModel: ObservableObject {
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
     /// An app on this Mac (Zoom, Meet, FaceTime…) is streaming from InputBridge Camera.
     @Published private(set) var cameraInUse = false
+    /// macOS only shows camera devices, InputBridge Camera included, to an app the user allowed to use the camera.
+    @Published private(set) var cameraAccessDenied = false
     /// Mirrors `updates.state` so the menu bar label (driven by this model) can show the update badge.
     @Published private(set) var updateAvailable = false
 
@@ -29,6 +32,7 @@ final class AppModel: ObservableObject {
     private let cameraSetup = CameraSetupWindowController()
     private var cameraUsage: VirtualCameraUsageMonitor?
     private var cancellables = Set<AnyCancellable>()
+    private var knownControllerRefresh: Task<Void, Never>?
     private var monitor: G915Monitor?
     /// Last profile applied, so the keyboard's own connect/disconnect after a switch does not re-apply it.
     private var lastApplied: (mode: ProfileMode, at: Date)?
@@ -36,6 +40,7 @@ final class AppModel: ObservableObject {
 
     init() {
         discovery.start()
+        startKnownControllerRefresh()
         restartKeyboardMonitor()
         cameraExtension.onNeedsApproval = { [weak self] in
             Task { @MainActor in
@@ -49,7 +54,7 @@ final class AppModel: ObservableObject {
         cameraUsage = VirtualCameraUsageMonitor { [weak self] inUse in
             Task { @MainActor in self?.cameraInUse = inUse }
         }
-        cameraUsage?.start()
+        startCameraMonitorWhenAllowed()
         // The controller's address can change after discovery; keep the camera extension pointed at it.
         discovery.$offers
             .receive(on: DispatchQueue.main)
@@ -63,6 +68,7 @@ final class AppModel: ObservableObject {
     }
 
     deinit {
+        knownControllerRefresh?.cancel()
         discovery.stop()
         monitor?.stop()
         cameraUsage?.stop()
@@ -229,9 +235,37 @@ final class AppModel: ObservableObject {
         monitor?.start()
     }
 
+    /// CoreMediaIO hides camera devices until the user allows camera access, and does not show them to a
+    /// process that touched it before that. Ask first, then start talking to InputBridge Camera.
+    private func startCameraMonitorWhenAllowed() {
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            cameraAccessDenied = false
+            cameraUsage?.start()
+        case .notDetermined:
+            guard cameraShareEnabled else { return }
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                Task { @MainActor in
+                    guard let self else { return }
+                    self.cameraAccessDenied = !granted
+                    if granted { self.cameraUsage?.start() }
+                }
+            }
+        default:
+            cameraAccessDenied = true
+        }
+    }
+
+    func openCameraPrivacySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     /// Turning camera sharing on installs the extension, or brings back the approval window.
     func setUpCameraIfNeeded() {
         guard cameraShareEnabled else { return }
+        startCameraMonitorWhenAllowed()
         switch cameraExtension.state {
         case .installed, .activating, .needsRestart:
             break
@@ -257,6 +291,39 @@ final class AppModel: ObservableObject {
             url: controller.cameraStreamURL(offer: offer).absoluteString,
             token: token
         ))
+    }
+
+    /// UDP discovery can be blocked by the network or a firewall. Ask the paired controller's last known
+    /// address and the manually entered one over HTTP at launch and every 30 seconds, so they show up under
+    /// Discovered controllers without pressing Check address.
+    private func startKnownControllerRefresh() {
+        knownControllerRefresh = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshKnownControllers()
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+            }
+        }
+    }
+
+    private func refreshKnownControllers() async {
+        var candidates: [(host: String, port: Int)] = []
+        if let stored = controller.storedController, let host = stored.host, let port = stored.httpPort {
+            candidates.append((host, port))
+        }
+        let manual = manualHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !manual.isEmpty, let port = Int(manualPort.trimmingCharacters(in: .whitespacesAndNewlines)) {
+            candidates.append((manual, port))
+        }
+        var tried = Set<String>()
+        for candidate in candidates where tried.insert("\(candidate.host):\(candidate.port)").inserted {
+            // Skip addresses UDP discovery has just confirmed.
+            if discovery.offers.contains(where: {
+                $0.host == candidate.host && $0.httpPort == candidate.port && Date().timeIntervalSince($0.lastSeen) < 20
+            }) { continue }
+            if let offer = try? await controller.probe(host: candidate.host, port: candidate.port) {
+                discovery.upsert(offer)
+            }
+        }
     }
 
     private func run(_ action: @escaping () async throws -> Void) async {
