@@ -90,7 +90,7 @@ public partial class MainWindow : Window
         var id = CameraList.SelectedValue as string ?? "";
         _runtime.SaveCameraSettings(CameraShareEnabled.IsChecked == true, id);
         RefreshStatus();
-        WpfMessageBox.Show("Camera setup saved. Apply the Mac profile to start sharing.", "InputBridge");
+        WpfMessageBox.Show("Camera setup saved. With the Mac profile active, the camera turns on when an app on the Mac uses InputBridge Camera.", "InputBridge");
     }
 
     private void SaveMonitors_Click(object sender, RoutedEventArgs e)

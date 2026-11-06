@@ -1,0 +1,4 @@
+#!/bin/sh
+# Quit a running InputBridge so the new version replaces it cleanly.
+/usr/bin/pkill -x InputBridge 2>/dev/null
+exit 0

@@ -81,21 +81,120 @@ jobs:
   macos:
     needs: metadata
     runs-on: macos-15
+    env:
+      # Signing and notarization run only when these secrets exist (they are not passed to forks),
+      # otherwise the job falls back to an ad-hoc signed build. See docs/RELEASING_TR.md.
+      # MACOS_TEAM_ID is not secret; it is read from the repository variable, or from a secret of that name.
+      TEAM_ID: ${{ vars.MACOS_TEAM_ID || secrets.MACOS_TEAM_ID }}
+      HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && (vars.MACOS_TEAM_ID || secrets.MACOS_TEAM_ID) != '' }}
+      HAS_NOTARY: ${{ secrets.NOTARY_KEY_P8 != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Report signing configuration
+        # Prints only whether each value is set, never the values.
+        run: |
+          echo "MACOS_TEAM_ID set:              ${{ env.TEAM_ID != '' }}"
+          echo "MACOS_CERTIFICATE_P12 set:      ${{ secrets.MACOS_CERTIFICATE_P12 != '' }}"
+          echo "MACOS_CERTIFICATE_PASSWORD set: ${{ secrets.MACOS_CERTIFICATE_PASSWORD != '' }}"
+          echo "MACOS_APP_PROFILE set:          ${{ secrets.MACOS_APP_PROFILE != '' }}"
+          echo "MACOS_CAMERA_PROFILE set:       ${{ secrets.MACOS_CAMERA_PROFILE != '' }}"
+          echo "NOTARY_KEY_P8 set:              ${{ secrets.NOTARY_KEY_P8 != '' }}"
+          echo "NOTARY_KEY_ID set:              ${{ secrets.NOTARY_KEY_ID != '' }}"
+          echo "NOTARY_ISSUER_ID set:           ${{ secrets.NOTARY_ISSUER_ID != '' }}"
+          if [[ "$HAS_SIGNING" != "true" ]]; then
+            echo "::warning title=Unsigned macOS build::Signing secrets are missing; the .pkg and DMG will be ad-hoc signed and the camera extension will not load."
+          fi
+          # Expression comparison is case-insensitive, so this matches the owner however GitHub spells it.
+          if [[ "${{ github.ref_type == 'tag' && github.repository_owner == 'ardanucakar' }}" == "true" && "$HAS_SIGNING" != "true" ]]; then
+            echo "::error::Refusing to publish an unsigned macOS release from the main repository."
+            exit 1
+          fi
       - name: Install XcodeGen
         run: brew install xcodegen
+      - name: Import Developer ID certificate and provisioning profiles
+        if: env.HAS_SIGNING == 'true'
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APP_PROFILE_B64: ${{ secrets.MACOS_APP_PROFILE }}
+          CAMERA_PROFILE_B64: ${{ secrets.MACOS_CAMERA_PROFILE }}
+        run: |
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          # Tolerate line breaks in the pasted base64 and a trailing newline in the pasted password.
+          printf '%s' "$CERTIFICATE_P12" | tr -d '[:space:]' | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          P12_PASSWORD="${CERTIFICATE_PASSWORD%$'\n'}"
+          P12_PASSWORD="${P12_PASSWORD%$'\r'}"
+          # Diagnostics without revealing either value: compare size and hash with the local file
+          # (stat -f%z DeveloperID.p12; shasum -a 256 DeveloperID.p12).
+          echo "Decoded MACOS_CERTIFICATE_P12: $(stat -f%z "$RUNNER_TEMP/certificate.p12") bytes, sha256 $(shasum -a 256 "$RUNNER_TEMP/certificate.p12" | cut -c1-16)"
+          if [[ ${#P12_PASSWORD} -gt 200 ]]; then
+            echo "::error::MACOS_CERTIFICATE_PASSWORD looks like a base64 file; the two certificate secrets may be swapped."
+            exit 1
+          fi
+          if ! P12_PASSWORD="$P12_PASSWORD" /usr/bin/openssl pkcs12 -in "$RUNNER_TEMP/certificate.p12" -nokeys \
+               -passin env:P12_PASSWORD -out /dev/null 2>/dev/null; then
+            echo "::error::MACOS_CERTIFICATE_PASSWORD does not open MACOS_CERTIFICATE_P12. Update both secrets from the same export."
+            exit 1
+          fi
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -P "$P12_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          # Without Apple's Developer ID G2 intermediate the identity is "not trusted" and codesign refuses it.
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer -o "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -k "$KEYCHAIN" || true
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/certificate.p12"
+
+          install_profile() {
+            local file="$RUNNER_TEMP/$1.provisionprofile"
+            echo "$2" | base64 --decode > "$file"
+            local uuid
+            uuid=$(security cms -D -i "$file" | plutil -extract UUID raw -)
+            for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" \
+                       "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+              mkdir -p "$dir"
+              cp "$file" "$dir/$uuid.provisionprofile"
+            done
+            echo "$uuid"
+          }
+          echo "MACOS_APP_PROFILE=$(install_profile app "$APP_PROFILE_B64")" >> "$GITHUB_ENV"
+          echo "MACOS_CAMERA_PROFILE=$(install_profile camera "$CAMERA_PROFILE_B64")" >> "$GITHUB_ENV"
+          echo "MACOS_TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
+      - name: Prepare notarization key
+        if: env.HAS_SIGNING == 'true' && env.HAS_NOTARY == 'true'
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          KEY="$RUNNER_TEMP/notary-key.p8"
+          echo "$NOTARY_KEY_P8" > "$KEY"
+          echo "NOTARY_KEY_PATH=$KEY" >> "$GITHUB_ENV"
       - name: Build macOS application and DMG
         env:
           INPUTBRIDGE_VERSION: ${{ needs.metadata.outputs.version }}
+          INPUTBRIDGE_BUILD_NUMBER: ${{ github.run_number }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
           chmod +x macos/scripts/package-macos.sh
           macos/scripts/package-macos.sh
+      - name: Remove signing material
+        if: always() && env.HAS_SIGNING == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          rm -f "$RUNNER_TEMP"/*.provisionprofile "$RUNNER_TEMP/notary-key.p8"
       - uses: actions/upload-artifact@v4
         with:
           name: InputBridge-macOS
           if-no-files-found: error
-          path: macos/dist/InputBridge-macOS.dmg
+          path: |
+            macos/dist/InputBridge-macOS.pkg
+            macos/dist/InputBridge-macOS.dmg
 
   release:
     if: needs.metadata.outputs.should_release == 'true'
@@ -122,11 +221,13 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
               artifacts/InputBridge-Windows/InputBridge-Windows-Setup.exe \
+              artifacts/InputBridge-macOS/InputBridge-macOS.pkg \
               artifacts/InputBridge-macOS/InputBridge-macOS.dmg \
               --clobber
           else
             gh release create "$TAG" \
               artifacts/InputBridge-Windows/InputBridge-Windows-Setup.exe \
+              artifacts/InputBridge-macOS/InputBridge-macOS.pkg \
               artifacts/InputBridge-macOS/InputBridge-macOS.dmg \
               --title "InputBridge ${TAG}" \
               --generate-notes \
