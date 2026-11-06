@@ -44,7 +44,7 @@ Mac uygulaması Windows Controller'ı multicast discovery ile bulur. Windows'un 
 5. Mac uygulamasını aç, otomatik bulunan Windows Controller için **Pair** düğmesine bas.
 6. Windows uygulamasında pairing isteğini onayla.
 7. Mac uygulamasında Bluetooth izni ver; Z407 ve G915/G913 bağlı/pair edilmiş olsun.
-8. Kamerayı paylaşmak için Windows **Camera** sekmesinde share’i aç, Brio’yu seç, kaydet. Mac Setup’ta **Install camera extension** ile Sistem Ayarları’nda izin ver; Zoom/Meet’te bir kez **InputBridge Camera** seç.
+8. Kamera paylaşımı yeni kurulumlarda açık gelir; Windows **Camera** sekmesinde doğru kameranın seçili olduğunu kontrol et. Zoom/Meet/FaceTime'da bir kez **InputBridge Camera** seç. Kamera yalnızca Mac'te bir uygulama onu kullanırken açılır.
 9. İki uygulamada da otomatik başlatmayı aç.
 
 ## Güvenlik modeli
@@ -81,7 +81,7 @@ Xcode'da `InputBridgeMac` scheme'ini çalıştır. Debug build'de Bluetooth ve y
 
 ## Release üretimi
 
-GitHub Actions Windows installer, macOS `.pkg` yükleyicisi ve macOS DMG üretir.
+GitHub Actions Windows installer, macOS `.pkg` yükleyicisi ve macOS DMG üretir. Ayrıntılar: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ```bash
 git tag v0.2.0

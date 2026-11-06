@@ -1,88 +1,136 @@
-# InputBridge
+<p align="center">
+  <img src="docs/images/icon.png" width="128" height="128" alt="InputBridge icon">
+</p>
 
-InputBridge is a two-client, local-network profile switcher for a Windows PC and a Mac.
+<h1 align="center">InputBridge</h1>
 
-The first built-in hardware profile:
+<p align="center">
+  <b>One desk, two computers.</b><br>
+  Move your monitors, speakers, keyboard and webcam between a Windows PC and a Mac with a single switch.
+</p>
 
-- Detects whether a Logitech G915/G913 keyboard is connected to the Mac through Bluetooth.
-- When the keyboard is connected to the Mac, applies the **Mac profile**:
-  - Logitech Z407 source → Bluetooth
-  - configured DDC/CI monitors → Mac input
-  - optional USB webcam on Windows → InputBridge Camera on the Mac (1080p, no microphone)
-- When the keyboard disconnects from the Mac (for example, LIGHTSPEED is selected), applies the **Windows profile**:
-  - Logitech Z407 source → AUX
-  - configured monitors → Windows input
-  - Windows webcam capture stops so local Windows apps can use the camera
+<p align="center">
+  <a href="https://github.com/ArdanucAKAR/InputBridge/releases/latest"><img src="https://img.shields.io/github/v/release/ArdanucAKAR/InputBridge?label=latest&color=2f81f7" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple" alt="macOS 13 or later">
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078d4?logo=windows" alt="Windows 10 or 11">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+</p>
 
-InputBridge uses local multicast discovery and a one-time, user-approved pairing flow. Users do not enter a controller IP address or copy tokens between machines.
+<p align="center">
+  <a href="https://github.com/ArdanucAKAR/InputBridge/releases/latest/download/InputBridge-macOS.pkg"><b>Download for Mac</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/ArdanucAKAR/InputBridge/releases/latest/download/InputBridge-Windows-Setup.exe"><b>Download for Windows</b></a>
+  &nbsp;·&nbsp;
+  <a href="README_TR.md">Türkçe</a>
+</p>
 
-## Components
+---
 
-- **Windows Controller** — a WPF tray app that exposes an authenticated local API, answers discovery requests, switches selected monitors through DDC/CI, and can publish a USB camera over the paired local stream.
-- **macOS Companion** — a SwiftUI menu-bar app that detects the configured keyboard, controls Z407 through CoreBluetooth, discovers the Windows Controller, installs the InputBridge Camera extension, and stores pairing credentials in Keychain.
+If your Windows PC and your Mac share the same monitors, speakers and keyboard, switching usually means pressing input buttons on every screen, changing the speaker source and re-pairing the keyboard. InputBridge does all of that for you: switch your Logitech keyboard to the Mac and the whole desk follows; switch it back and everything returns to Windows.
 
-## Supported adapters in this release
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mac-menu-dark.png">
+    <img src="docs/images/mac-menu.png" width="376" alt="InputBridge in the Mac menu bar, with the Mac profile active">
+  </picture>
+</p>
 
-| Adapter type | Built-in support |
-|---|---|
-| Trigger | Logitech G915/G913 Bluetooth connected/disconnected |
-| BLE action | Logitech Z407 Bluetooth/AUX source switching |
-| Display action | DDC/CI VCP `0x60` input switching |
-| Keyboard action | G915/G913 LIGHTSPEED ↔ Bluetooth host switching (HID++ CHANGE_HOST) |
-| Camera share | Windows USB webcam → Mac virtual camera (signed macOS build) |
+## What it switches
 
-See [README_TR.md](README_TR.md) for the Turkish setup guide and [docs/RELEASING_TR.md](docs/RELEASING_TR.md) for release instructions.
+| | Windows profile | Mac profile |
+|---|---|---|
+| **Monitors** (DDC/CI) | Windows input | Mac input |
+| **Logitech Z407 speakers** | AUX | Bluetooth |
+| **Logitech G915 / G913 keyboard** | LIGHTSPEED receiver | Bluetooth |
+| **USB webcam** plugged into the PC | Used by Windows apps | Available on the Mac as **InputBridge Camera** |
 
-## Development
+- **Automatic** — switching the keyboard's host is enough. You can also pick a profile from the Mac menu bar or the Windows tray.
+- **Your webcam on both computers** — the camera stays plugged into the PC. On the Mac it shows up as *InputBridge Camera* in Zoom, Meet, Teams or FaceTime, and it only turns on while one of those apps is actually using it.
+- **No setup files or IP addresses** — the Mac finds the PC on your network by itself, and you approve the pairing once on Windows.
+- **Stays up to date** — both apps update themselves from GitHub Releases.
 
-### Windows
+## Screenshots
 
-```powershell
-cd windows
-./scripts/run-dev.ps1
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mac-settings-dark.png">
+    <img src="docs/images/mac-settings.png" width="760" alt="Mac settings window showing the paired Windows PC">
+  </picture>
+  <br><sub>Mac settings: the Windows PC is found automatically and paired once.</sub>
+</p>
 
-Requires the .NET 8 SDK on Windows.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/mac-camera-dark.png">
+    <img src="docs/images/mac-camera.png" width="620" alt="Camera settings on the Mac">
+  </picture>
+  <br><sub>InputBridge Camera brings the PC's webcam to the Mac and turns it on only when an app uses it.</sub>
+</p>
 
-### macOS
+## What you need
 
-```zsh
-brew install xcodegen
-cd macos
-xcodegen generate
-open InputBridgeMac.xcodeproj
-```
+- A **Windows 10 or 11** PC and a **Mac with macOS 13 Ventura or later**, on the same home or office network.
+- Monitors that support **DDC/CI** (most do; it may need to be turned on in the monitor's menu).
+- Optional: **Logitech Z407** speakers, a **Logitech G915 / G913** keyboard paired with the PC's LIGHTSPEED receiver and with the Mac over Bluetooth, and a **USB webcam** plugged into the PC.
 
-Requires macOS 13+ and Xcode 15+.
+## Install
 
-## Distribution
+### 1. Windows
 
-A version tag triggers GitHub Actions to build:
+1. Download and run **[InputBridge-Windows-Setup.exe](https://github.com/ArdanucAKAR/InputBridge/releases/latest/download/InputBridge-Windows-Setup.exe)**.
+2. InputBridge starts in the system tray. Open it and go to **Monitors**: tick the screens on your shared desk and choose which input each one uses for Windows and for the Mac (for example *DisplayPort 1* and *HDMI 1*).
 
-- `InputBridge-Windows-Setup.exe`
-- `InputBridge-macOS.pkg` (installer for new users)
-- `InputBridge-macOS.dmg` (used by the in-app updater)
+### 2. Mac
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
+1. Download and open **[InputBridge-macOS.pkg](https://github.com/ArdanucAKAR/InputBridge/releases/latest/download/InputBridge-macOS.pkg)**, then click **Continue** and **Install**. InputBridge opens by itself and lives in the menu bar.
+2. Allow what macOS asks for, once:
+   - **Bluetooth** — to talk to the keyboard and the speakers.
+   - **Local network** — to find and talk to your PC.
+   - **Camera** — so InputBridge can set up *InputBridge Camera*. It never turns a camera on by itself.
+   - **InputBridge Camera** — in the window that appears, click **Open System Settings** and turn it on.
+3. In **Settings… → Windows Controller**, your PC appears under *Discovered controllers*. Click **Pair**, then click **Approve** on the PC's **Pairing** page.
 
-Without signing secrets the macOS build is ad-hoc signed and meant for testing; the camera extension needs a Developer ID signed build. When the signing and notarization secrets are configured (see [docs/RELEASING_TR.md](docs/RELEASING_TR.md)), the workflow signs, notarizes and staples the installer package and the DMG.
+That's it. In Zoom, Meet or FaceTime, choose **InputBridge Camera** once.
 
-### Automatic updates
+## Everyday use
 
-Both apps check `https://api.github.com/repos/ArdanucAKAR/InputBridge/releases/latest` 45 seconds after launch and every 6 hours. When the published release is newer than the running version, the app downloads its installer in the background and checks it against the SHA-256 digest that GitHub reports for the asset:
+- **Switch the keyboard** to the Mac (Bluetooth) or back to the PC (LIGHTSPEED), and the monitors, speakers and camera follow.
+- **Or pick a profile** — *Windows* or *Mac* in the Mac menu bar, or *Apply Windows / Mac profile* in the Windows tray menu.
+- **Pause automation** with *Switch with keyboard* in the Mac menu if you want to move the keyboard without moving the rest of the desk.
 
-- **Windows** — the tray menu and *Updates* tab offer *Install and restart*. The Inno Setup installer runs silently (one UAC prompt), then relaunches InputBridge in the background.
-- **macOS** — the menu bar and setup window offer *Install update and restart*. InputBridge quits, a helper swaps the app bundle in place and relaunches it. If the app is not in a writable folder (for example, it runs from the DMG), the DMG opens for a manual drag-and-drop.
+## Troubleshooting
 
-Automatic install is opt-in in both apps; automatic checking can be turned off. Drafts are ignored, and pre-releases (tags such as `v0.3.0-beta.1`) are offered only when **Receive beta versions** is enabled. Beta builds turn that option on by default. Local development builds report version `0.0.0` and skip automatic checks. The updater relies on the asset names `InputBridge-Windows-Setup.exe` and `InputBridge-macOS.dmg`, so keep them unchanged.
+<details>
+<summary><b>My PC does not appear under Discovered controllers</b></summary>
 
-## Security
+Make sure both computers are on the same network and that Windows treats it as a *Private* network (the installer only opens InputBridge's ports on private networks). If your router blocks discovery, enter the PC's IP address under *Manual connection* and click **Check address** — InputBridge remembers it.
+</details>
 
-InputBridge is intended for a trusted private network. Do not expose the Windows controller port to the public internet. See [SECURITY.md](SECURITY.md).
+<details>
+<summary><b>InputBridge Camera is black or missing</b></summary>
+
+- On the PC, open **Camera** and check that sharing is on and the right camera is selected.
+- On the Mac, open **Settings… → Camera**. If it asks for camera access, click **Allow in System Settings…**, allow InputBridge, then quit and reopen InputBridge.
+- The camera only streams while the Mac profile is active; on the Windows profile it stays with Windows apps.
+</details>
+
+<details>
+<summary><b>A monitor does not switch</b></summary>
+
+Turn on DDC/CI in the monitor's on-screen menu and check the input codes on the PC's **Monitors** page. Common values are `0x0F` (DisplayPort 1), `0x11` (HDMI 1) and `0x12` (HDMI 2).
+</details>
+
+## Privacy and security
+
+- InputBridge only works on your local network; nothing goes through the internet except update checks against GitHub.
+- A Mac can only control the PC after you approve its pairing on Windows. The pairing key is stored in the Mac's Keychain.
+- The webcam stream goes directly from your PC to your Mac, and only while an app on the Mac is using InputBridge Camera.
+- Do not expose the PC's InputBridge port to the internet. See [SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Bug reports and pull requests are welcome. Building from source and the release process are described in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## License
 
-MIT.
+[MIT](LICENSE)

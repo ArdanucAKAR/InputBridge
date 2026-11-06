@@ -366,7 +366,7 @@ private struct ControllerPane: View {
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(offer.name).fontWeight(.medium)
-                                Text("\(offer.host):\(offer.httpPort)")
+                                Text(verbatim: "\(offer.host):\(offer.httpPort)") // verbatim: no locale grouping (41.715)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
