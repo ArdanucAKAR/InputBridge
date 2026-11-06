@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.8
 
 - The Windows camera turns on only while an app on the Mac (Zoom, Meet, FaceTime…) uses InputBridge Camera, and turns off a few seconds after; switching to the Mac profile no longer lights it up.
 - InputBridge Camera now loads on signed builds: the extension is named after its bundle ID, declares its usage description and pulls frames from Windows over the network instead of through /tmp, which its sandbox does not allow.
