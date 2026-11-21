@@ -13,3 +13,16 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - run: dotnet test windows/tests/InputBridge.Windows.Tests
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: macos
+        run: xcodegen generate
+      - name: Build and run unit tests
+        working-directory: macos
+        run: xcodebuild test -project InputBridgeMac.xcodeproj -scheme InputBridgeMac -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO

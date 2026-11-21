@@ -45,7 +45,8 @@ targets:
         embed: true
         codeSign: true
     scheme:
-      testTargets: []
+      testTargets:
+        - InputBridgeMacTests
       gatherCoverageData: false
   InputBridgeCamera:
     type: system-extension
@@ -70,3 +71,17 @@ targets:
       - sdk: CoreVideo.framework
       - sdk: CoreGraphics.framework
       - sdk: ImageIO.framework
+  InputBridgeMacTests:
+    type: bundle.unit-test
+    platform: macOS
+    # Hostless (no TEST_HOST): the pure battery files are compiled into the bundle instead of loading the app.
+    sources:
+      - path: Tests/InputBridgeMacTests
+      - path: Sources/InputBridgeMac/Battery/BatteryModels.swift
+      - path: Sources/InputBridgeMac/Battery/BatteryParsing.swift
+      - path: ../shared/fixtures/battery-readings.json
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.inputbridge.mac.tests
+        GENERATE_INFOPLIST_FILE: YES
