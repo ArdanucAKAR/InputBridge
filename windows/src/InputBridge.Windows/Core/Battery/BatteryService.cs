@@ -48,7 +48,8 @@ public sealed class BatteryService : IAsyncDisposable
         var now = _clock.GetUtcNow();
         var kept = readings
             .Where(r => r.DeviceId == BatteryIds.SharedKeyboard)
-            .Select(r => (Reading: r with { Remote = true }, ReceivedAt: now))
+            .GroupBy(r => r.DeviceId)
+            .Select(g => (Reading: g.Last() with { Remote = true }, ReceivedAt: now))
             .ToList();
         lock (_lock) _remote = kept;
         RaiseChanged();

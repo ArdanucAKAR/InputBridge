@@ -81,6 +81,17 @@ public class BatteryServiceTests
     }
 
     [Fact]
+    public void Remote_KeepsOnlyLastReadingPerDeviceId()
+    {
+        var service = Create(new FakeSource());
+
+        service.SetRemote([SharedKeyboard(40), SharedKeyboard(30)]);
+
+        var shown = Assert.Single(service.Visible);
+        Assert.Equal(30, shown.Components[0].Percent);
+    }
+
+    [Fact]
     public void Remote_EmptyListClearsPreviousRemote()
     {
         var service = Create(new FakeSource());
