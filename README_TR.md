@@ -51,6 +51,10 @@ Mac uygulaması Windows Controller'ı multicast discovery ile bulur. Windows'un 
 
 Windows uygulaması, PC'deki LIGHTSPEED alıcılarına bağlı her kablosuz Logitech cihazın pil seviyesini ayrı bir tepsi ikonunda yüzde olarak gösterir: %15 ve altı kırmızı, şarj olurken küçük şimşek, G915/G913 Mac'e bağlıyken değer Mac'ten geliyorsa soluk. **Battery** sekmesinden kapatılabilir. Windows 11 yeni tepsi ikonlarını gizli ikonlar menüsüne koyar; bir kez *Ayarlar → Kişiselleştirme → Görev çubuğu → Diğer sistem tepsisi simgeleri* bölümünden sabitle. Sabitleme yeniden başlatmalarda korunur.
 
+### Pil göstergeleri (Mac)
+
+Mac uygulaması menü çubuğunda, InputBridge ikonunun soluna bir pil şeridi ekler: Mac'in Bluetooth'una bağlıyken G915/G913, sol, sağ ve kutusu ayrı ayrı gösterilen AirPods ile Apple trackpad, fare ve klavyeler (%15 ve altı kırmızı, şarj olurken şimşek). Değerler 5 dakikada bir, uykudan uyanınca ve bir Bluetooth cihazı bağlanınca okunur; bağlantısı kopan cihaz kaybolur. Eşleşmiş Mac ile PC G915/G913 değerini paylaşır; klavyenin bağlı olmadığı makine onu soluk gösterir. Şeride tıklamak ayarlar penceresini açar. Menü çubuğu panelindeki veya *Devices* bölümündeki **Show battery levels** anahtarıyla kapatılabilir; klavye değeri Windows'la paylaşılmaya devam eder. Klavyeyi okumak, klavye geçişinin zaten kullandığı Input Monitoring iznini ister; izin yoksa klavye sessizce atlanır.
+
 ## Güvenlik modeli
 
 - Windows yalnızca private/local ağ adreslerinden pairing ve profil komutu kabul eder.

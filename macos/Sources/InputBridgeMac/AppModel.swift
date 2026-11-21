@@ -16,6 +16,13 @@ final class AppModel: ObservableObject {
     @Published var keyboardSwitchEnabled = UserDefaults.standard.object(forKey: "keyboard-switch-enabled") as? Bool ?? true
     @Published var manualHost = UserDefaults.standard.string(forKey: "manual-controller-host") ?? ""
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
+    /// "Show battery levels": only hides the menu bar strip; the keyboard reading is still shared with Windows.
+    @Published var batteryIndicatorsEnabled = UserDefaults.standard.object(forKey: "battery-indicators-enabled") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(batteryIndicatorsEnabled, forKey: "battery-indicators-enabled")
+            battery.enabled = batteryIndicatorsEnabled
+        }
+    }
     /// Mirrors `updates.state` so the menu bar label (driven by this model) can show the update badge.
     @Published private(set) var updateAvailable = false
 
@@ -29,6 +36,14 @@ final class AppModel: ObservableObject {
     /// Last profile applied, so the keyboard's own connect/disconnect after a switch does not re-apply it.
     private var lastApplied: (mode: ProfileMode, at: Date)?
     private var keyboardPoll: Task<Void, Never>?
+    private lazy var battery: BatteryMonitor = BatteryMonitor(
+        keyboard: LogitechBluetoothBatterySource(pattern: Self.savedKeyboardPattern),
+        others: [AppleBatterySource(excluding: Self.savedKeyboardPattern)],
+        controller: controller,
+        offer: { [weak self] in self?.selectedOffer },
+        enabled: batteryIndicatorsEnabled)
+    private let batteryItem = BatteryStatusItem()
+    private var batteryStrip: AnyCancellable?
 
     init() {
         discovery.start()
@@ -39,6 +54,21 @@ final class AppModel: ObservableObject {
             .removeDuplicates()
             .assign(to: &$updateAvailable)
         updates.start()
+        batteryStrip = battery.$visible.sink { [weak self] readings in self?.batteryItem.show(readings) }
+        battery.start()
+    }
+
+    /// The saved keyboard name pattern. Battery sources call this off the main thread, so it reads UserDefaults
+    /// rather than `keyboardPattern`, which may hold unsaved edits.
+    nonisolated private static func savedKeyboardPattern() -> NSRegularExpression {
+        let pattern = UserDefaults.standard.string(forKey: "keyboard-name-pattern") ?? "G915|G913"
+        return (try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]))
+            ?? (try! NSRegularExpression(pattern: "G915|G913", options: [.caseInsensitive]))
+    }
+
+    /// Lets a click on the battery strip open the settings window (the SwiftUI `openWindow` action).
+    func setOpenSetupWindow(_ open: @escaping () -> Void) {
+        batteryItem.openSetup = open
     }
 
     deinit {
@@ -116,6 +146,8 @@ final class AppModel: ObservableObject {
     func detected(_ mode: ProfileMode) async {
         currentMode = mode
         updateKeyboardPolling(keyboardOnMac: mode == .mac)
+        // The keyboard just arrived on or left this Mac; give it a moment to come up before reading.
+        battery.refresh(after: 5)
         if let last = lastApplied, last.mode == mode, Date().timeIntervalSince(last.at) < 20 {
             return // the keyboard moved because InputBridge just applied this profile
         }
@@ -143,6 +175,7 @@ final class AppModel: ObservableObject {
             currentMode = mode
             lastApplied = (mode, Date())
             updateCameraStream(mode, offer: offer)
+            battery.refresh(after: 5)
 
             // Mac profile: Windows moves the keyboard off its receiver. Windows profile: only this Mac can
             // reach the keyboard while it is on Bluetooth.

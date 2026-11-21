@@ -35,6 +35,10 @@ InputBridge uses local multicast discovery and a one-time, user-approved pairing
 
 The Windows Controller shows the battery level of each wireless Logitech device on the PC's LIGHTSPEED receivers as its own tray icon, with the percentage drawn in it (red at 15 % or less, a bolt while charging, faded when the G915/G913 is connected to the Mac and the Mac shared the reading). Turn them off on the **Battery** page. Windows 11 puts new tray icons in the hidden icons menu: pin them once in *Settings → Personalization → Taskbar → Other system tray icons*; the pin is kept across restarts.
 
+### Battery indicators (Mac)
+
+The Mac app adds a battery strip to the menu bar, left of the InputBridge icon: the G915/G913 while it is on the Mac's Bluetooth, AirPods with left, right and case shown separately, and Apple trackpads, mice and keyboards (red at 15 % or less, a bolt while charging). Levels are read every 5 minutes, on wake and when a Bluetooth device connects; a device that disconnects disappears. The paired Mac and PC share the G915/G913 reading, so the machine the keyboard is not connected to shows it faded. Clicking the strip opens the settings window. Turn it off with **Show battery levels** in the menu bar panel or under *Devices*; the keyboard reading is still shared with Windows. Reading the keyboard needs the Input Monitoring permission the keyboard switch already uses; without it the keyboard is skipped silently.
+
 See [README_TR.md](README_TR.md) for the Turkish setup guide and [docs/RELEASING_TR.md](docs/RELEASING_TR.md) for release instructions.
 
 ## Development

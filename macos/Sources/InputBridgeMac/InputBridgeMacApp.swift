@@ -9,9 +9,7 @@ struct InputBridgeMacApp: App {
         MenuBarExtra {
             MenuBarPanel(model: model, updates: model.updates)
         } label: {
-            Image(nsImage: MenuBarImage.make(badged: model.updateAvailable))
-                .renderingMode(.original)
-                .accessibilityLabel(model.updateAvailable ? "InputBridge, update available" : "InputBridge")
+            MenuBarLabel(model: model)
         }
         .menuBarExtraStyle(.window)
 
@@ -24,6 +22,19 @@ struct InputBridgeMacApp: App {
 }
 
 // MARK: - Menu bar icon
+
+private struct MenuBarLabel: View {
+    @ObservedObject var model: AppModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Image(nsImage: MenuBarImage.make(badged: model.updateAvailable))
+            .renderingMode(.original)
+            .accessibilityLabel(model.updateAvailable ? "InputBridge, update available" : "InputBridge")
+            // The label appears at launch, so the battery strip can open the settings window from then on.
+            .onAppear { model.setOpenSetupWindow { openWindow(id: "setup") } }
+    }
+}
 
 /// The colour app icon at menu bar size, optionally with an orange "!" badge in the lower-right corner.
 enum MenuBarImage {
@@ -113,6 +124,9 @@ private struct MenuBarPanel: View {
                 .onChange(of: model.automationEnabled) { value in
                     UserDefaults.standard.set(value, forKey: "automation-enabled")
                 }
+                Toggle(isOn: $model.batteryIndicatorsEnabled) {
+                    Label("Show battery levels", systemImage: "battery.100")
+                }
                 Toggle(isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) })) {
                     Label("Launch at login", systemImage: "power")
                 }
@@ -145,6 +159,7 @@ private struct MenuBarPanel: View {
             .padding(.vertical, 10)
         }
         .frame(width: 330)
+        .onAppear { model.setOpenSetupWindow { openWindow(id: "setup") } }
     }
 }
 
@@ -447,6 +462,14 @@ private struct DevicesPane: View {
                 Text("Keyboard connection")
             } footer: {
                 Text("Mac profile: the Windows PC moves the keyboard to Bluetooth. Windows profile: this Mac sends it back to LIGHTSPEED. macOS may ask to allow InputBridge under Privacy & Security → Input Monitoring.")
+            }
+
+            Section {
+                Toggle("Show battery levels", isOn: $model.batteryIndicatorsEnabled)
+            } header: {
+                Text("Battery")
+            } footer: {
+                Text("Shows the G915/G913, AirPods (left, right, case) and Apple trackpads, mice and keyboards in the menu bar; a keyboard reading from Windows is drawn faded. Applies right away. The keyboard reading is shared with Windows either way.")
             }
 
             Section {
