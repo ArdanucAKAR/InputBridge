@@ -15,7 +15,7 @@ jobs:
       - run: dotnet test windows/tests/InputBridge.Windows.Tests
 
   macos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - name: Install XcodeGen
