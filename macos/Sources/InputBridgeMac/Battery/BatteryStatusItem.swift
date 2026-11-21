@@ -17,8 +17,11 @@ final class BatteryStatusItem: NSObject {
         }
         // Created on first use, after the MenuBarExtra item exists, so macOS places it to the left of that icon.
         let item = self.item ?? makeItem()
+        let tooltip = Self.tooltip(readings)
         item.button?.attributedTitle = Self.title(segments)
-        item.button?.toolTip = Self.tooltip(readings)
+        item.button?.toolTip = tooltip
+        // The title is symbols and numbers; VoiceOver reads the device names and levels instead.
+        item.button?.setAccessibilityLabel(tooltip)
         item.isVisible = true
     }
 

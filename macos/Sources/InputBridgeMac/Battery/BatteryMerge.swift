@@ -5,14 +5,19 @@ enum BatteryMerge {
     /// Local readings plus the shared keyboard from Windows (marked remote) when this Mac has no reading of its own,
     /// ordered keyboard, mouse, headset, trackpad, other, then by name. Any other remote reading is ignored.
     static func visible(local: [BatteryReading], remote: [BatteryReading]) -> [BatteryReading] {
-        let localIds = Set(local.map(\.deviceId))
         var shown = local
-        if !localIds.contains(BatteryIds.sharedKeyboard),
+        if needsRemoteKeyboard(local: local),
            var keyboard = remote.last(where: { $0.deviceId == BatteryIds.sharedKeyboard }) {
             keyboard.remote = true
             shown.append(keyboard)
         }
         return shown.sorted(by: precedes)
+    }
+
+    /// True while this Mac has no shared keyboard reading of its own, so the one Windows has is worth fetching
+    /// between full reads.
+    static func needsRemoteKeyboard(local: [BatteryReading]) -> Bool {
+        !local.contains { $0.deviceId == BatteryIds.sharedKeyboard }
     }
 
     private static func precedes(_ a: BatteryReading, _ b: BatteryReading) -> Bool {

@@ -132,11 +132,11 @@ final class ControllerClient {
     }
 
     /// Sends this Mac's shared keyboard reading; an empty list tells Windows the keyboard is not on this Mac.
-    func postBattery(_ readings: [BatteryReading], offer: ControllerOffer) async throws {
+    func postBattery(_ readings: [BatteryReading], offer: ControllerOffer, timeout: TimeInterval = 5) async throws {
         guard let token = keychain.read(tokenAccount) else { throw ClientError.notPaired }
         var request = URLRequest(url: offer.baseURL.appendingPathComponent("api/battery"))
         request.httpMethod = "POST"
-        request.timeoutInterval = 5
+        request.timeoutInterval = timeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(BatteryEnvelope(readings: Self.acceptedByController(readings)))

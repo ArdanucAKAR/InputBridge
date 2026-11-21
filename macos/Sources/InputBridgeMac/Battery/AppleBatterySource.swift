@@ -97,7 +97,8 @@ struct AppleBatterySource: BatterySource {
         let output = NSMutableData()
         let drained = DispatchSemaphore(value: 0)
         DispatchQueue.global(qos: .utility).async {
-            output.append(pipe.fileHandleForReading.readDataToEndOfFile())
+            // readToEnd() throws where readDataToEndOfFile() would raise an Objective-C exception and crash.
+            if let data = try? pipe.fileHandleForReading.readToEnd() { output.append(data) }
             drained.signal()
         }
 
