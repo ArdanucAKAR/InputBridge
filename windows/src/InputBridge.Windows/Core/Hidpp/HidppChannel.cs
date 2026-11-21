@@ -43,7 +43,10 @@ internal sealed class HidppChannel : IDisposable
 
     public int ReportLength { get; }
 
-    /// <summary>Raised for every input report, whatever its report id.</summary>
+    /// <summary>
+    /// Raised for every input report, whatever its report id. Handlers run on the read-loop thread
+    /// and must not modify the array.
+    /// </summary>
     public event Action<byte[]>? ReportReceived;
 
     public static HidppChannel? TryOpen(string path, byte softwareId)
@@ -151,6 +154,17 @@ internal sealed class HidppChannel : IDisposable
         }
     }
 
+    /// <summary>Invokes each handler in isolation so one throwing subscriber cannot stop the others or the read loop.</summary>
+    internal static void Dispatch(Action<byte[]>? handlers, byte[] report)
+    {
+        if (handlers is null) return;
+        foreach (var handler in handlers.GetInvocationList().Cast<Action<byte[]>>())
+        {
+            try { handler(report); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"HID++ report handler failed: {ex}"); }
+        }
+    }
+
     private async Task ReadLoopAsync()
     {
         var buffer = new byte[ReportLength];
@@ -166,7 +180,7 @@ internal sealed class HidppChannel : IDisposable
                     _collector?.Invoke(report);
                     if (_matches?.Invoke(report) == true) _pending?.TrySetResult(report);
                 }
-                ReportReceived?.Invoke(report);
+                Dispatch(ReportReceived, report);
             }
         }
         catch
