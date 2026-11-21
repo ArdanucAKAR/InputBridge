@@ -37,6 +37,12 @@ final class BatteryMergeTests: XCTestCase {
         XCTAssertEqual(BatteryMerge.visible(local: [trackpad], remote: [remoteAirPods]), [trackpad])
     }
 
+    func testNeedsRemoteKeyboardOnlyWithoutLocalSharedKeyboard() {
+        XCTAssertTrue(BatteryMerge.needsRemoteKeyboard(local: []))
+        XCTAssertTrue(BatteryMerge.needsRemoteKeyboard(local: [trackpad]))
+        XCTAssertFalse(BatteryMerge.needsRemoteKeyboard(local: [trackpad, localKeyboard]))
+    }
+
     func testOrdersKeyboardHeadsetTrackpadThenName() {
         let airPods = reading("apple:AirPods", "AirPods", .headset)
         let otherTrackpad = reading("apple:A Trackpad", "a trackpad", .trackpad)
