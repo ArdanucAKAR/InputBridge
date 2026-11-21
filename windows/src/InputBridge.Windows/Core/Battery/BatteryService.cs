@@ -12,6 +12,8 @@ public sealed class BatteryService : IAsyncDisposable
     private readonly TimeProvider _clock;
     private readonly object _lock = new();
     private IReadOnlyList<(BatteryReading Reading, DateTimeOffset ReceivedAt)> _remote = [];
+    private ITimer? _remoteExpiry;
+    private bool _disposed;
 
     public BatteryService(IEnumerable<IBatterySource> sources, Func<bool> enabled, TimeProvider clock)
     {
@@ -51,7 +53,11 @@ public sealed class BatteryService : IAsyncDisposable
             .GroupBy(r => r.DeviceId)
             .Select(g => (Reading: g.Last() with { Remote = true }, ReceivedAt: now))
             .ToList();
-        lock (_lock) _remote = kept;
+        lock (_lock)
+        {
+            _remote = kept;
+            ScheduleRemoteExpiry(kept.Count > 0);
+        }
         RaiseChanged();
     }
 
@@ -64,6 +70,11 @@ public sealed class BatteryService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        lock (_lock)
+        {
+            _disposed = true;
+            ScheduleRemoteExpiry(false);
+        }
         foreach (var source in _sources)
         {
             source.Changed -= OnSourceChanged;
@@ -78,6 +89,18 @@ public sealed class BatteryService : IAsyncDisposable
             .ToList();
 
     private void OnSourceChanged() => RaiseChanged();
+
+    /// <summary>
+    /// Visible drops the remote reading once it is RemoteLifetime old; this tells listeners at that moment so the
+    /// faded icon does not linger. Each SetRemote replaces the previous timer. Call under _lock.
+    /// </summary>
+    private void ScheduleRemoteExpiry(bool pending)
+    {
+        _remoteExpiry?.Dispose();
+        _remoteExpiry = pending && !_disposed
+            ? _clock.CreateTimer(_ => RaiseChanged(), null, RemoteLifetime, Timeout.InfiniteTimeSpan)
+            : null;
+    }
 
     // Sources raise Changed without isolating subscribers, so no listener failure may escape or starve the others.
     private void RaiseChanged()

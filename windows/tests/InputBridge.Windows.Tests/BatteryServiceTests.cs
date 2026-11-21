@@ -71,6 +71,63 @@ public class BatteryServiceTests
     }
 
     [Fact]
+    public void Remote_Expiry_RaisesChangedOnce()
+    {
+        var clock = new FakeTimeProvider(T0);
+        var service = Create(new FakeSource(), clock);
+        service.SetRemote([SharedKeyboard(40)]);
+        var count = 0;
+        service.Changed += () => count++;
+
+        clock.Advance(TimeSpan.FromMinutes(10) + TimeSpan.FromSeconds(59));
+        Assert.Equal(0, count);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(1, count);
+        Assert.Empty(service.Visible);
+
+        clock.Advance(TimeSpan.FromMinutes(30));
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void Remote_NewerReadingPushesTheExpiry()
+    {
+        var clock = new FakeTimeProvider(T0);
+        var service = Create(new FakeSource(), clock);
+        service.SetRemote([SharedKeyboard(40)]);
+        var count = 0;
+        service.Changed += () => count++;
+
+        clock.Advance(TimeSpan.FromMinutes(6));
+        service.SetRemote([SharedKeyboard(38)]);
+        Assert.Equal(1, count);
+
+        clock.Advance(TimeSpan.FromMinutes(5));
+        Assert.Equal(1, count);
+        Assert.Single(service.Visible);
+
+        clock.Advance(TimeSpan.FromMinutes(6));
+        Assert.Equal(2, count);
+        Assert.Empty(service.Visible);
+    }
+
+    [Fact]
+    public void Remote_ClearingCancelsTheExpiry()
+    {
+        var clock = new FakeTimeProvider(T0);
+        var service = Create(new FakeSource(), clock);
+        service.SetRemote([SharedKeyboard(40)]);
+        service.SetRemote([]);
+        var count = 0;
+        service.Changed += () => count++;
+
+        clock.Advance(TimeSpan.FromMinutes(12));
+
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
     public void Remote_IgnoresNonSharedIds()
     {
         var service = Create(new FakeSource());
