@@ -6,6 +6,9 @@ using Forms = System.Windows.Forms;
 
 namespace InputBridge.Windows;
 
+/// <summary>What a notification-icon callback asks for.</summary>
+public enum TrayIconAction { None, Open, ContextMenu }
+
 /// <summary>
 /// One notification-area icon per visible battery device, created with <c>Shell_NotifyIcon</c> and a stable GUID so a
 /// pin survives restarts. An icon whose device disappears is hidden, not deleted, so it keeps its place.
@@ -15,6 +18,7 @@ public sealed class TrayBatteryIcons : IDisposable
 {
     private const int CallbackMessage = 0x8000 + 1; // WM_APP + 1
     private const int WM_CONTEXTMENU = 0x007B;
+    private const int NIN_SELECT = 0x0400, NIN_KEYSELECT = 0x0401;
     private const int NIM_ADD = 0, NIM_MODIFY = 1, NIM_DELETE = 2, NIM_SETVERSION = 4;
     private const int NIF_MESSAGE = 0x01, NIF_ICON = 0x02, NIF_TIP = 0x04, NIF_STATE = 0x08, NIF_GUID = 0x20, NIF_SHOWTIP = 0x80;
     private const int NIS_HIDDEN = 0x01;
@@ -36,6 +40,9 @@ public sealed class TrayBatteryIcons : IDisposable
 
     /// <summary>Right-click (or the menu key) on any battery icon; the point is the cursor position in screen coordinates.</summary>
     public event Action<Point>? ContextMenuRequested;
+
+    /// <summary>Left click (or Space/Enter) on any battery icon.</summary>
+    public event Action? OpenRequested;
 
     /// <summary>Windows draws the taskbar dark when <c>SystemUsesLightTheme</c> is 0 (also the default when the value is missing).</summary>
     public static bool IsTaskbarDark()
@@ -157,8 +164,11 @@ public sealed class TrayBatteryIcons : IDisposable
         data.dwStateMask = NIS_HIDDEN;
         if (!Shell_NotifyIconW(NIM_MODIFY, ref data))
         {
-            // Explorer no longer has it; it is added again when the device comes back.
-            Debug.WriteLine($"Battery tray: hiding icon {entry.Guid} failed.");
+            // Explorer may still show it (a modify can fail for an icon it has); delete it so no stale level stays
+            // up. It is added again when the device comes back.
+            Debug.WriteLine($"Battery tray: hiding icon {entry.Guid} failed; deleting it.");
+            var delete = NewData(entry.Guid);
+            Shell_NotifyIconW(NIM_DELETE, ref delete);
             entry.Added = false;
             entry.Key = "";
         }
@@ -177,15 +187,32 @@ public sealed class TrayBatteryIcons : IDisposable
         Update(_lastVisible, _lastDark);
     }
 
+    /// <summary>
+    /// NOTIFYICON_VERSION_4: the low word of lParam is the event. A left click arrives as the raw button messages and
+    /// then NIN_SELECT; only NIN_SELECT counts, so one click opens the window once.
+    /// </summary>
+    internal static TrayIconAction Classify(IntPtr lParam) => (int)(lParam.ToInt64() & 0xFFFF) switch
+    {
+        NIN_SELECT or NIN_KEYSELECT => TrayIconAction.Open,
+        WM_CONTEXTMENU => TrayIconAction.ContextMenu,
+        _ => TrayIconAction.None,
+    };
+
     private void OnCallback(IntPtr lParam)
     {
-        // NOTIFYICON_VERSION_4: the low word of lParam is the event.
-        if ((lParam.ToInt64() & 0xFFFF) != WM_CONTEXTMENU) return;
-        // The cursor position is DPI-virtualised for this process like the main tray icon's menu; the
-        // anchor in wParam is not.
-        var point = Forms.Cursor.Position;
-        SetForegroundWindow(_window.Handle); // so the menu closes when the user clicks elsewhere
-        ContextMenuRequested?.Invoke(point);
+        switch (Classify(lParam))
+        {
+            case TrayIconAction.Open:
+                OpenRequested?.Invoke();
+                break;
+            case TrayIconAction.ContextMenu:
+                // The cursor position is DPI-virtualised for this process like the main tray icon's menu; the
+                // anchor in wParam is not.
+                var point = Forms.Cursor.Position;
+                SetForegroundWindow(_window.Handle); // so the menu closes when the user clicks elsewhere
+                ContextMenuRequested?.Invoke(point);
+                break;
+        }
     }
 
     private static int IconSize()

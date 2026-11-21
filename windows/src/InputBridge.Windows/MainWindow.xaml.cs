@@ -144,6 +144,7 @@ public partial class MainWindow : Window
 
     private System.Windows.Media.ImageSource? _overlay;
 
+    public const int BatteryPage = 4;
     public const int UpdatesPage = 5;
 
     public void ShowPage(int index) => NavList.SelectedIndex = index;

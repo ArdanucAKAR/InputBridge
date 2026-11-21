@@ -57,13 +57,22 @@ public class BatteryIconVisualTests
         Assert.StartsWith("GGGG", tip);
     }
 
-    [Fact]
-    public void Tooltip_keeps_the_real_keyboard_name_whole()
-    {
-        const string name = "G915 TKL LIGHTSPEED Wireless RGB Mechanical Gaming Keyboard";
+    private const string G915HidppName = "G915 TKL LIGHTSPEED Wireless RGB Mechanical Gaming Keyboard";
 
-        Assert.Equal($"{name} — 82% (on Mac)", BatteryIconVisual.Tooltip(Reading(82, remote: true, name: name)));
-    }
+    [Fact]
+    public void Tooltip_uses_the_short_display_name_of_the_keyboard() =>
+        Assert.Equal("G915 TKL — 82% (on Mac)", BatteryIconVisual.Tooltip(Reading(82, remote: true, name: G915HidppName)));
+
+    [Theory]
+    [InlineData(G915HidppName, "G915 TKL")]
+    [InlineData("PRO X 2", "PRO X 2")]
+    [InlineData("MX Master 3S", "MX Master 3S")]
+    [InlineData("G502 X LIGHTSPEED", "G502 X")]
+    [InlineData("G915 wireless keyboard", "G915")]
+    [InlineData("Gaming Mouse", "Gaming Mouse")]
+    [InlineData("Wireless Mouse", "Wireless Mouse")]
+    public void DisplayName_cuts_at_the_first_marketing_word(string name, string expected) =>
+        Assert.Equal(expected, BatteryIconVisual.DisplayName(name));
 
     private const string Exe = @"C:\Program Files\InputBridge\InputBridge.exe";
 

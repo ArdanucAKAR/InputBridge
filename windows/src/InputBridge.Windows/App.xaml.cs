@@ -94,6 +94,11 @@ public partial class App : System.Windows.Application
             return;
         }
         _batteryIcons.ContextMenuRequested += point => menu.Show(point);
+        _batteryIcons.OpenRequested += () =>
+        {
+            ShowMainWindow();
+            _window?.ShowPage(InputBridge.Windows.MainWindow.BatteryPage);
+        };
         Runtime.Battery.Changed += OnBatteryChanged;
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;

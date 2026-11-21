@@ -5,8 +5,9 @@ namespace InputBridge.Windows;
 
 /// <summary>
 /// Batteries of Logitech devices on LIGHTSPEED/Unifying receivers, driven by HID++ notifications so sleeping devices
-/// are never woken: one startup scan per receiver, then reads only when a device links, on the device's own battery
-/// events, and at most every 30 minutes for devices known to be online.
+/// are never woken: one startup slot scan per receiver and app session, then reads only when a device links, on the
+/// device's own battery events, and at most every 30 minutes for devices known to be online. Every open (including a
+/// reopen after resume) asks the receiver itself which paired devices are linked, which wakes nothing.
 /// </summary>
 public sealed class LogitechBatterySource : IBatterySource
 {
@@ -23,6 +24,7 @@ public sealed class LogitechBatterySource : IBatterySource
     private readonly Action<string>? _log;
     private readonly object _lock = new();
     private readonly Dictionary<string, Receiver> _receivers = new();
+    private readonly ReceiverReopenPolicy _reopen = new(TimeProvider.System);
     private readonly CancellationTokenSource _cancel = new();
     private CancellationTokenRegistration _stopRegistration;
     private Task? _loop;
@@ -120,20 +122,25 @@ public sealed class LogitechBatterySource : IBatterySource
         }
         if (removed) RaiseChanged();
 
-        var added = new List<Receiver>();
+        var added = new List<(Receiver Receiver, bool Scan)>();
         foreach (var longPath in longPaths)
         {
             var key = ReceiverKey(longPath);
-            lock (_lock) { if (_receivers.ContainsKey(key)) continue; }
+            lock (_lock) { if (_receivers.ContainsKey(key) || !_reopen.CanOpen(key)) continue; }
             var shortPath = shortPaths.FirstOrDefault(path => ReceiverKey(path) == key);
             if (shortPath is null) continue;
             var receiver = OpenReceiver(key, shortPath, longPath, token);
             if (receiver is null) continue;
-            lock (_lock) _receivers[key] = receiver;
+            bool scan;
+            lock (_lock)
+            {
+                _receivers[key] = receiver;
+                scan = _reopen.OnOpened(key);
+            }
             WatchForRemoval(receiver);
-            added.Add(receiver);
+            added.Add((receiver, scan));
         }
-        await Task.WhenAll(added.Select(receiver => InitialiseAsync(receiver, token)));
+        await Task.WhenAll(added.Select(item => InitialiseAsync(item.Receiver, item.Scan, token)));
     }
 
     private Receiver? OpenReceiver(string key, string shortPath, string longPath, CancellationToken token)
@@ -157,7 +164,8 @@ public sealed class LogitechBatterySource : IBatterySource
 
     /// <summary>
     /// A channel's read loop ends on its own when the receiver is unplugged (or the handle goes stale, e.g. across
-    /// sleep): drop the receiver at once so its devices disappear, and let the next tick reopen it if it is back.
+    /// sleep): drop the receiver at once so its devices disappear, and let a later tick reopen it if it is back. A
+    /// receiver that keeps closing right after opening is reopened ever more rarely (<see cref="ReceiverReopenPolicy"/>).
     /// </summary>
     private void WatchForRemoval(Receiver receiver) =>
         _ = Task.WhenAny(receiver.Short.Completion, receiver.Long.Completion).ContinueWith(_ =>
@@ -167,19 +175,33 @@ public sealed class LogitechBatterySource : IBatterySource
                 // Already gone when the source disposed it itself (rescan or shutdown).
                 if (!_receivers.TryGetValue(receiver.Key, out var current) || !ReferenceEquals(current, receiver)) return;
                 _receivers.Remove(receiver.Key);
+                _reopen.OnClosed(receiver.Key);
                 receiver.Dispose();
             }
             Log($"receiver closed: {receiver.Key}");
             RaiseChanged();
         }, TaskScheduler.Default);
 
-    private async Task InitialiseAsync(Receiver receiver, CancellationToken token)
+    /// <param name="receiver">The receiver just opened.</param>
+    /// <param name="scan">
+    /// Run the slot ping scan: only on the first open of this receiver in the app session, as it wakes sleeping devices.
+    /// </param>
+    /// <param name="token">Stops the source.</param>
+    private async Task InitialiseAsync(Receiver receiver, bool scan, CancellationToken token)
     {
         try
         {
             await EnableWirelessNotificationsAsync(receiver, token);
 
-            // The one allowed startup scan: it wakes sleeping devices, so it is never repeated for this receiver.
+            // The receiver answers from its own link table with a 0x41 notification per paired device (handled in
+            // OnShortReport); no radio traffic, so this is safe on every open.
+            var reported = await RegisterRequestAsync(receiver, HidppReceiverNotifications.ReportConnectedDevicesRequest(),
+                report => HidppReceiverNotifications.IsReportConnectedDevicesReply(report) ? report : null, token);
+            Log($"{receiver.Key}: connected-devices report {(reported is null ? "not confirmed" : "requested")}");
+            if (!scan) return;
+
+            // The one allowed startup scan, kept as a fallback for receivers that do not answer the register query:
+            // it wakes sleeping devices, so it runs once per receiver per app session.
             List<byte> online;
             await HidppGate.Instance.WaitAsync(token);
             try { online = await receiver.Long.FindOnlineDevicesAsync(FeatureDeviceName, token); }
@@ -189,7 +211,9 @@ public sealed class LogitechBatterySource : IBatterySource
             var toRead = new List<byte>();
             lock (_lock)
             {
-                foreach (var index in online) toRead.AddRange(receiver.Tracker.OnLinked(index));
+                // Slots the receiver already reported as linked are read through their notification.
+                foreach (var index in online.Where(index => !receiver.Tracker.IsLinked(index)))
+                    toRead.AddRange(receiver.Tracker.OnLinked(index));
             }
             foreach (var index in toRead) await ReadDeviceAsync(receiver, index, discover: true, token);
         }
@@ -202,7 +226,7 @@ public sealed class LogitechBatterySource : IBatterySource
     /// <summary>Turns on the receiver's wireless (link) notifications, keeping every flag that is already set.</summary>
     private async Task EnableWirelessNotificationsAsync(Receiver receiver, CancellationToken token)
     {
-        var current = await RegisterRequestAsync(receiver, HidppReceiverNotifications.ReadNotificationFlagsRequest(), HidppReceiverNotifications.GetRegister,
+        var current = await RegisterRequestAsync(receiver, HidppReceiverNotifications.ReadNotificationFlagsRequest(),
             report => HidppReceiverNotifications.ParseNotificationFlagsReply(report), token);
         if (current is null)
         {
@@ -213,22 +237,26 @@ public sealed class LogitechBatterySource : IBatterySource
         Log($"{receiver.Key}: notification flags {Convert.ToHexString(current)}");
         if (HidppReceiverNotifications.WirelessNotificationsEnabled(current)) return;
 
-        var written = await RegisterRequestAsync(receiver, HidppReceiverNotifications.WriteNotificationFlagsRequest(current), HidppReceiverNotifications.SetRegister,
+        var written = await RegisterRequestAsync(receiver, HidppReceiverNotifications.WriteNotificationFlagsRequest(current),
             report => HidppReceiverNotifications.IsNotificationFlagsWriteReply(report) ? report : null, token);
         Log($"{receiver.Key}: wireless notifications {(written is null ? "not confirmed" : "enabled")}");
     }
 
-    /// <summary>One short-collection register access under the HID++ gate; null on timeout or HID++ 1.0 error.</summary>
-    private static async Task<byte[]?> RegisterRequestAsync(Receiver receiver, byte[] request, byte subId,
+    /// <summary>
+    /// One short-collection register access <c>[0x10, 0xFF, subId, register, …]</c> under the HID++ gate; null on
+    /// timeout or HID++ 1.0 error.
+    /// </summary>
+    private static async Task<byte[]?> RegisterRequestAsync(Receiver receiver, byte[] request,
         Func<byte[], byte[]?> parseReply, CancellationToken token)
     {
+        var (subId, register) = (request[2], request[3]);
         var completion = new TaskCompletionSource<byte[]?>(TaskCreationOptions.RunContinuationsAsynchronously);
         await HidppGate.Instance.WaitAsync(token);
         try
         {
             receiver.RegisterReply = report =>
             {
-                if (HidppReceiverNotifications.IsRegisterError(report, subId)) completion.TrySetResult(null);
+                if (HidppReceiverNotifications.IsRegisterError(report, subId, register)) completion.TrySetResult(null);
                 else if (parseReply(report) is { } reply) completion.TrySetResult(reply);
             };
             await receiver.Short.SendRawAsync(request, token);

@@ -33,7 +33,7 @@ public static class BatteryIconVisual
         var component = Primary(reading);
         var note = reading.Remote ? " (on Mac)" : component.Charging ? " (charging)" : "";
         var suffix = $" — {Label(component.Percent)}%{note}";
-        var name = reading.Name;
+        var name = DisplayName(reading.Name);
         var room = MaxTooltipLength - suffix.Length;
         if (name.Length > room)
         {
@@ -42,6 +42,23 @@ public static class BatteryIconVisual
             name = name[..cut] + "…";
         }
         return name + suffix;
+    }
+
+    private static readonly string[] NameTails = [" LIGHTSPEED", " Wireless", " Gaming", " Mechanical"];
+
+    /// <summary>
+    /// The name shown to the user (tooltip, Battery page), never used for ids or matching: the device name cut before
+    /// its first marketing word, e.g. "G915 TKL LIGHTSPEED Wireless RGB Mechanical Gaming Keyboard" → "G915 TKL".
+    /// </summary>
+    public static string DisplayName(string name)
+    {
+        var cut = NameTails
+            .Select(tail => name.IndexOf(tail, StringComparison.OrdinalIgnoreCase))
+            .Where(index => index > 0)
+            .DefaultIfEmpty(name.Length)
+            .Min();
+        var shortName = name[..cut].TrimEnd();
+        return shortName.Length > 0 ? shortName : name;
     }
 
     /// <summary>

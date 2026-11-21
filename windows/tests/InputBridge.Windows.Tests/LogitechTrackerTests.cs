@@ -90,6 +90,28 @@ public class LogitechTrackerTests
         Assert.True(HidppReceiverNotifications.IsRegisterError([0x10,0xFF,0x8F,0x81,0x00,0x03,0x00], 0x81));
         Assert.False(HidppReceiverNotifications.IsRegisterError([0x10,0xFF,0x8F,0x80,0x00,0x03,0x00], 0x81));
     }
+    [Fact] public void ReportConnectedDevices_Request() =>
+        Assert.Equal(new byte[]{0x10,0xFF,0x80,0x02,0x02,0x00,0x00}, HidppReceiverNotifications.ReportConnectedDevicesRequest());
+    [Fact] public void ReportConnectedDevicesReply_Recognised()
+    {
+        Assert.True(HidppReceiverNotifications.IsReportConnectedDevicesReply([0x10,0xFF,0x80,0x02,0x00,0x00,0x00]));
+        Assert.False(HidppReceiverNotifications.IsReportConnectedDevicesReply([0x10,0xFF,0x80,0x00,0x00,0x00,0x00]));
+        Assert.False(HidppReceiverNotifications.IsReportConnectedDevicesReply([0x10,0xFF,0x81,0x02,0x00,0x00,0x00]));
+    }
+    [Fact] public void RegisterError_MatchesTheRegister()
+    {
+        Assert.True(HidppReceiverNotifications.IsRegisterError([0x10,0xFF,0x8F,0x80,0x02,0x03,0x00], 0x80, 0x02));
+        Assert.False(HidppReceiverNotifications.IsRegisterError([0x10,0xFF,0x8F,0x80,0x00,0x03,0x00], 0x80, 0x02));
+    }
+    [Fact] public void Tracker_IsLinkedFollowsLinkEvents()
+    {
+        var t = new LogitechDeviceTracker();
+        Assert.False(t.IsLinked(1));
+        t.OnLinked(1);
+        Assert.True(t.IsLinked(1));
+        t.OnLinkLost(1);
+        Assert.False(t.IsLinked(1));
+    }
     [Fact] public void WirelessBit_Detected()
     {
         Assert.True(HidppReceiverNotifications.WirelessNotificationsEnabled([0x00,0x01,0x00]));

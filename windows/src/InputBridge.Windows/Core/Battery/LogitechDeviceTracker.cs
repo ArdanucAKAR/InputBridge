@@ -45,6 +45,9 @@ internal sealed class LogitechDeviceTracker
     /// </summary>
     public void OnReadAttempt(byte index, DateTimeOffset at) => SlotFor(index).LastAttempt = at;
 
+    /// <summary>True while the slot's device is known to be online.</summary>
+    public bool IsLinked(byte index) => _slots.TryGetValue(index, out var slot) && slot.Linked;
+
     /// <summary>The discovered device in the slot, or null before discovery.</summary>
     public LogitechDeviceInfo? Info(byte index) => _slots.TryGetValue(index, out var slot) ? slot.Info : null;
 
