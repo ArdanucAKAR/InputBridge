@@ -156,6 +156,28 @@ soluk). Donanım kısmı kullanıcının cihazlarıyla elle doğrulanır (Window
 
 - **PRO X 2 kulaklık protokolü.** Mevcut kodda yok ve HID++ değil. Önce bu PC'de cihazla
   araştırılıp doğrulanacak; güvenilir okunamazsa ilk sürüm onsuz çıkar ve ayrı iş olarak kalır.
+  **Görev 6 bulguları (2026-11-21, salt-okuma, ~2 saatlik süre sınırı):** ilk sürüm kulaklıksız çıkıyor.
+  - Dongle `046D:0AF7`, `MI_03` arayüzünde üç HID koleksiyonu açıyor: `COL01` (UP `000C`, tüketici
+    kontrolü, rapor `0x02`), `COL02` (UP `FF13` U `0001`; giriş raporu `0x07`, çıkış raporu `0x06`,
+    62 bayt), `COL03` (UP `FFA0` U `0001`; giriş/çıkış raporu `0x51`, 64 bayt). Hiçbirinde HID++
+    rapor kimlikleri (`0x10`/`0x11`) tanımlı değil.
+  - HID++ 2.0 ROOT getFeature (`0x1004`, `0x1F20`, `0x1000`; indeks `0xFF` ve `0x01`) `0x11`
+    çerçevesiyle iki vendor koleksiyonuna da yazılmak istendi; Windows her yazmayı "The parameter is
+    incorrect" ile reddetti, yani istek cihaza hiç ulaşmadı. Standart HID++ bu dongle'da kullanılamaz;
+    protokol `0x06`/`0x07` ve/veya `0x51` raporları üzerinden üreticiye özel.
+  - Aynı HID++ yükünü `0x06` veya `0x51` rapor kimliğiyle göndermek denenmedi: o raporlarda baytların
+    ne anlama geldiği bilinmediği için bunun bir sorgu olduğundan emin olunamıyor (salt-okuma kuralı).
+  - Pasif dinleme: `COL02` ve `COL03` toplam ~15 dakika dinlendi, hiç giriş raporu
+    gelmedi. Kulaklık büyük ihtimalle kapalıydı (G HUB'ın kulaklık için son okuması
+    2026-11-20 08:33 UTC, %37); G HUB'ın kendi sorgu/cevap trafiği de bu sürede görülmedi.
+  - Doğruluk kaynağı: G HUB son okuduğu pil yüzdesini `%LOCALAPPDATA%\LGHUB\settings.db` içinde
+    (`data` tablosundaki tek JSON kaydı, düz anahtarlar `battery/prox2wirelessheadset/percentage` →
+    `{percentage, time}`) tutuyor. Dosyanın kopyası salt-okunur açılarak kulaklık okumaları
+    karşılaştırılabilir; fare (`battery/prox2wirelessmouse/...`) ve G915 için de kayıt var.
+  - Sonraki adım (ayrı iş): kulaklık açıkken `COL02`/`COL03` pasif dinlenip G HUB'ın istek/cevap
+    çiftleri yakalanmalı; pil sorgusu ve cevaptaki yüzde baytı trafikten kesin çıkarılır ve
+    `settings.db` değeriyle iki kez eşleşirse kaynak eklenir (`deviceId`
+    `"logitech-headset:PRO X 2"`, `Kind = Headset`, tek `Main` bileşen).
 - **G915'in pil özelliği.** G915 büyük ihtimalle yalnızca voltaj (`0x1001`) bildiriyor; yüzde
   tahmini kaba olabilir. Gerçek cihazla karşılaştırılacak.
 - **AirPods kaynağı.** `system_profiler` yavaş (~1–2 sn) ve biçimi macOS sürümüne göre değişebilir;
