@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Windows shows the battery level of each wireless Logitech device (G915/G913 keyboard, LIGHTSPEED mice) as its own tray icon with the percentage drawn in it: red at 15 % or less, a bolt while charging, faded when the keyboard is connected to the Mac and the reading comes from there. An icon hides as soon as the receiver reports its device disconnected (e.g. switched off); whether a device that only falls asleep is reported that way is still being verified. Left-clicking an icon opens the Battery page.
+- Windows shows the battery level of each wireless Logitech device (G915/G913 keyboard, LIGHTSPEED mice) as its own tray icon with the percentage drawn in it: red at 15 % or less, a bolt while charging, faded when the keyboard is connected to the Mac and the reading comes from there. An icon hides as soon as the receiver reports its device disconnected — when it is switched off or falls asleep — and comes back with a fresh reading when it wakes; InputBridge does not wake sleeping devices to read them. Left-clicking an icon opens the Battery page.
 - New Battery page on Windows with the "Show battery levels in the taskbar" switch and the list of devices with a reading.
 - Windows 11 puts new tray icons in the hidden icons menu; pin them once in *Settings → Personalization → Taskbar → Other system tray icons*. The icons keep their identity across restarts, so the pin is kept.
 - The Mac shows a battery strip in the menu bar, left of the InputBridge icon: the G915/G913 on Bluetooth, AirPods left, right and case separately, and Apple trackpads, mice and keyboards. Red at 15 % or less, a bolt while charging; disconnected devices disappear. Clicking it opens the settings window.
