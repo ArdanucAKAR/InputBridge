@@ -1,3 +1,7 @@
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using System.Windows;
 using Forms = System.Windows.Forms;
 
@@ -16,6 +20,13 @@ public partial class App : System.Windows.Application
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        if (e.Args.Any(x => string.Equals(x, "--battery-dump", StringComparison.OrdinalIgnoreCase)))
+        {
+            // Diagnostic: read batteries without the server, discovery or any window, then quit.
+            await DumpBatteriesAsync();
+            Shutdown();
+            return;
+        }
         _startHidden = e.Args.Any(x => string.Equals(x, "--background", StringComparison.OrdinalIgnoreCase));
         Runtime = new AppRuntime();
         await Runtime.StartAsync();
@@ -64,6 +75,29 @@ public partial class App : System.Windows.Application
         Runtime.Updates.UpdateReady += info => Dispatcher.BeginInvoke(() => NotifyUpdateReady(info));
         Runtime.Updates.InstallerLaunched += () => Dispatcher.BeginInvoke(async () => await ExitAsync());
         RefreshUpdateMenu();
+    }
+
+    /// <summary>Writes the Logitech readings after 5 s to %TEMP%\InputBridge-battery.json (and a log beside it).</summary>
+    private static async Task DumpBatteriesAsync()
+    {
+        var settings = new SettingsStore().Load();
+        var pattern = string.IsNullOrWhiteSpace(settings.KeyboardNamePattern) ? "G915|G913" : settings.KeyboardNamePattern;
+        var log = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        await using var source = new LogitechBatterySource(
+            () => new Regex(pattern, RegexOptions.IgnoreCase),
+            message => log.Enqueue($"{DateTimeOffset.Now:HH:mm:ss.fff} {message}"));
+        await source.StartAsync(CancellationToken.None);
+        await Task.Delay(TimeSpan.FromSeconds(5));
+
+        var json = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }
+        };
+        var temp = Path.GetTempPath();
+        await File.WriteAllTextAsync(Path.Combine(temp, "InputBridge-battery.json"), JsonSerializer.Serialize(source.Current, json));
+        await File.WriteAllLinesAsync(Path.Combine(temp, "InputBridge-battery.log"), log);
     }
 
     private async Task OnUpdateMenuClickAsync()
