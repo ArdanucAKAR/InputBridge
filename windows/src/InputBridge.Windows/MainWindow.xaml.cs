@@ -25,6 +25,9 @@ public partial class MainWindow : Window
         BetaUpdates.IsChecked = _runtime.Settings.ReceiveBetaUpdates;
         KeyboardSwitchEnabled.IsChecked = _runtime.Settings.KeyboardSwitchEnabled;
         KeyboardNamePattern.Text = _runtime.Settings.KeyboardNamePattern;
+        BatteryIndicatorsEnabled.IsChecked = _runtime.Settings.BatteryIndicatorsEnabled;
+        _runtime.Battery.Changed += RefreshBattery;
+        RefreshBattery();
         RefreshUpdates();
         RefreshMonitors();
         RefreshPairings();
@@ -141,7 +144,7 @@ public partial class MainWindow : Window
 
     private System.Windows.Media.ImageSource? _overlay;
 
-    public const int UpdatesPage = 4;
+    public const int UpdatesPage = 5;
 
     public void ShowPage(int index) => NavList.SelectedIndex = index;
 
@@ -178,6 +181,22 @@ public partial class MainWindow : Window
         {
             WpfMessageBox.Show("The keyboard name is not a valid regular expression.", "InputBridge", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private void RefreshBattery()
+    {
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(RefreshBattery); return; }
+        var devices = _runtime.Battery.Visible.Select(BatteryIconVisual.Tooltip).ToList();
+        BatteryDeviceList.ItemsSource = devices;
+        BatteryEmptyText.Text = _runtime.Settings.BatteryIndicatorsEnabled
+            ? "No device has reported a battery level yet."
+            : "Battery levels are turned off.";
+        BatteryEmptyText.Visibility = devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void BatterySettings_Click(object sender, RoutedEventArgs e)
+    {
+        _runtime.SaveBatterySettings(BatteryIndicatorsEnabled.IsChecked == true);
     }
 
     private void UpdateSettings_Click(object sender, RoutedEventArgs e)

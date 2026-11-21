@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Windows;
+using Microsoft.Win32;
 using Forms = System.Windows.Forms;
 
 namespace InputBridge.Windows;
@@ -14,6 +16,7 @@ public partial class App : System.Windows.Application
     private Forms.ToolStripMenuItem? _updateMenuItem;
     private System.Drawing.Icon? _trayIcon;
     private System.Drawing.Icon? _badgedTrayIcon;
+    private TrayBatteryIcons? _batteryIcons;
     private MainWindow? _window;
     private bool _startHidden;
 
@@ -75,6 +78,54 @@ public partial class App : System.Windows.Application
         Runtime.Updates.UpdateReady += info => Dispatcher.BeginInvoke(() => NotifyUpdateReady(info));
         Runtime.Updates.InstallerLaunched += () => Dispatcher.BeginInvoke(async () => await ExitAsync());
         RefreshUpdateMenu();
+
+        StartBatteryIcons(menu);
+    }
+
+    private void StartBatteryIcons(Forms.ContextMenuStrip menu)
+    {
+        try
+        {
+            _batteryIcons = new TrayBatteryIcons(Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "InputBridge.exe"));
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Battery tray icons are unavailable: {ex.Message}");
+            return;
+        }
+        _batteryIcons.ContextMenuRequested += point => menu.Show(point);
+        Runtime.Battery.Changed += OnBatteryChanged;
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+        RefreshBatteryIcons();
+    }
+
+    // BatteryService raises Changed on any thread; the tray icons belong to the UI thread.
+    private void OnBatteryChanged() => Dispatcher.BeginInvoke(RefreshBatteryIcons);
+    private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e) => Dispatcher.BeginInvoke(RefreshBatteryIcons);
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(RefreshBatteryIcons);
+
+    private void RefreshBatteryIcons()
+    {
+        try
+        {
+            _batteryIcons?.Update(Runtime.Battery.Visible, TrayBatteryIcons.IsTaskbarDark());
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Battery tray update failed: {ex.Message}");
+        }
+    }
+
+    private void StopBatteryIcons()
+    {
+        if (_batteryIcons is null) return;
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+        SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+        Runtime.Battery.Changed -= OnBatteryChanged;
+        try { _batteryIcons.Dispose(); }
+        catch (Exception ex) { Debug.WriteLine($"Removing battery tray icons failed: {ex.Message}"); }
+        _batteryIcons = null;
     }
 
     /// <summary>Writes the Logitech readings after 5 s to %TEMP%\InputBridge-battery.json (and a log beside it).</summary>
@@ -166,6 +217,7 @@ public partial class App : System.Windows.Application
     private async Task ExitAsync()
     {
         if (_tray is not null) _tray.Visible = false;
+        StopBatteryIcons();
         await Runtime.StopAsync();
         Shutdown();
     }
@@ -173,6 +225,7 @@ public partial class App : System.Windows.Application
     protected override async void OnExit(ExitEventArgs e)
     {
         if (_tray is not null) _tray.Visible = false;
+        StopBatteryIcons();
         if (Runtime is not null) await Runtime.StopAsync();
         base.OnExit(e);
     }

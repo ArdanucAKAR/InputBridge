@@ -47,6 +47,10 @@ Mac uygulaması Windows Controller'ı multicast discovery ile bulur. Windows'un 
 8. Kamerayı paylaşmak için Windows **Camera** sekmesinde share’i aç, Brio’yu seç, kaydet. Mac Setup’ta **Install camera extension** ile Sistem Ayarları’nda izin ver; Zoom/Meet’te bir kez **InputBridge Camera** seç.
 9. İki uygulamada da otomatik başlatmayı aç.
 
+### Pil göstergeleri (Windows)
+
+Windows uygulaması, PC'deki LIGHTSPEED alıcılarına bağlı her kablosuz Logitech cihazın pil seviyesini ayrı bir tepsi ikonunda yüzde olarak gösterir: %15 ve altı kırmızı, şarj olurken küçük şimşek, G915/G913 Mac'e bağlıyken değer Mac'ten geliyorsa soluk. **Battery** sekmesinden kapatılabilir. Windows 11 yeni tepsi ikonlarını gizli ikonlar menüsüne koyar; bir kez *Ayarlar → Kişiselleştirme → Görev çubuğu → Diğer sistem tepsisi simgeleri* bölümünden sabitle. Sabitleme yeniden başlatmalarda korunur.
+
 ## Güvenlik modeli
 
 - Windows yalnızca private/local ağ adreslerinden pairing ve profil komutu kabul eder.

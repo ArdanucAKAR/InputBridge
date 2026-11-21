@@ -60,6 +60,12 @@
             </StackPanel>
           </ListBoxItem>
           <ListBoxItem>
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Style="{StaticResource Glyph}" Text="&#xE83F;" Margin="0,0,12,0"/>
+              <TextBlock Text="Battery"/>
+            </StackPanel>
+          </ListBoxItem>
+          <ListBoxItem>
             <Grid>
               <StackPanel Orientation="Horizontal">
                 <TextBlock Style="{StaticResource Glyph}" Text="&#xE895;" Margin="0,0,12,0"/>
@@ -261,6 +267,37 @@
               </DockPanel>
             </Border>
           </DockPanel>
+        </TabItem>
+
+        <!-- Battery -->
+        <TabItem>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+              <TextBlock Text="Battery" Style="{StaticResource PageTitle}"/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="Each wireless device with a battery reading gets its own icon in the taskbar notification area, showing its charge in percent. The keyboard reading is shared with the paired Mac."/>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <CheckBox x:Name="BatteryIndicatorsEnabled" Style="{StaticResource ToggleSwitch}" Click="BatterySettings_Click"
+                            Content="Show battery levels in the taskbar"/>
+                  <TextBlock Style="{StaticResource Caption}" Margin="0,10,0,0" TextWrapping="Wrap"
+                             Text="Windows 11 puts new icons in the hidden icons menu. Pin them once in Settings → Personalization → Taskbar → Other system tray icons."/>
+                </StackPanel>
+              </Border>
+              <Border Style="{StaticResource Card}">
+                <StackPanel>
+                  <TextBlock Text="Devices" Style="{StaticResource CardTitle}"/>
+                  <ItemsControl x:Name="BatteryDeviceList" Margin="0,8,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock x:Name="BatteryEmptyText" Style="{StaticResource Caption}" Margin="0,6,0,0"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
         </TabItem>
 
         <!-- Updates -->

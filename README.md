@@ -31,6 +31,10 @@ InputBridge uses local multicast discovery and a one-time, user-approved pairing
 | Keyboard action | G915/G913 LIGHTSPEED ↔ Bluetooth host switching (HID++ CHANGE_HOST) |
 | Camera share | Windows USB webcam → Mac virtual camera (signed macOS build) |
 
+### Battery indicators (Windows)
+
+The Windows Controller shows the battery level of each wireless Logitech device on the PC's LIGHTSPEED receivers as its own tray icon, with the percentage drawn in it (red at 15 % or less, a bolt while charging, faded when the G915/G913 is connected to the Mac and the Mac shared the reading). Turn them off on the **Battery** page. Windows 11 puts new tray icons in the hidden icons menu: pin them once in *Settings → Personalization → Taskbar → Other system tray icons*; the pin is kept across restarts.
+
 See [README_TR.md](README_TR.md) for the Turkish setup guide and [docs/RELEASING_TR.md](docs/RELEASING_TR.md) for release instructions.
 
 ## Development
