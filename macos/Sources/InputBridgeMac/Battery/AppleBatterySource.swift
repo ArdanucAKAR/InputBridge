@@ -7,9 +7,9 @@ import IOKit
 struct AppleBatterySource: BatterySource {
     private static let profilerTimeout: TimeInterval = 10
 
-    private let excluding: () -> NSRegularExpression
+    private let excluding: @Sendable () -> NSRegularExpression
 
-    init(excluding: @escaping () -> NSRegularExpression) {
+    init(excluding: @escaping @Sendable () -> NSRegularExpression) {
         self.excluding = excluding
     }
 

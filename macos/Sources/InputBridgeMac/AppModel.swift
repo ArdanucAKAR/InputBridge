@@ -37,8 +37,8 @@ final class AppModel: ObservableObject {
     private var lastApplied: (mode: ProfileMode, at: Date)?
     private var keyboardPoll: Task<Void, Never>?
     private lazy var battery: BatteryMonitor = BatteryMonitor(
-        keyboard: LogitechBluetoothBatterySource(pattern: Self.savedKeyboardPattern),
-        others: [AppleBatterySource(excluding: Self.savedKeyboardPattern)],
+        keyboard: LogitechBluetoothBatterySource(pattern: { AppModel.savedKeyboardPattern() }),
+        others: [AppleBatterySource(excluding: { AppModel.savedKeyboardPattern() })],
         controller: controller,
         offer: { [weak self] in self?.selectedOffer },
         enabled: batteryIndicatorsEnabled)

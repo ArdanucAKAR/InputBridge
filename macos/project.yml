@@ -81,6 +81,7 @@ targets:
       - path: Sources/InputBridgeMac/Battery/BatteryParsing.swift
       - path: Sources/InputBridgeMac/Battery/BatteryStrip.swift
       - path: Sources/InputBridgeMac/Battery/BatteryMerge.swift
+      - path: Sources/InputBridgeMac/Battery/BatteryRefreshGate.swift
       - path: ../shared/fixtures/battery-readings.json
         buildPhase: resources
     settings:

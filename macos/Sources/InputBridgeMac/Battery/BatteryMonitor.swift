@@ -5,8 +5,9 @@ import IOBluetooth
 /// Reads this Mac's device batteries every 5 minutes and on wake, Bluetooth connect/disconnect and `refresh()`,
 /// shares the keyboard reading with the paired Windows controller and publishes what the menu bar strip shows.
 ///
-/// Reads are blocking (HID++ and `system_profiler`), so they run one at a time on a serial background queue; a
-/// trigger that arrives while a read and its controller exchange are in flight runs one more cycle afterwards.
+/// Reads are blocking (HID++ and `system_profiler`), so they run one at a time on a serial background queue;
+/// `BatteryRefreshGate` gives triggers that arrive while a read and its controller exchange are in flight one more
+/// cycle afterwards.
 /// Turning the setting off only empties `visible`: the keyboard is still read and shared, so the other machine
 /// keeps seeing it.
 @MainActor
@@ -31,9 +32,7 @@ final class BatteryMonitor: NSObject, ObservableObject {
 
     private var local: [BatteryReading] = []
     private var remote: [BatteryReading] = []
-    private var cycleRunning = false
-    private var cyclePending = false
-    private var delayedRefresh: Task<Void, Never>?
+    private var gate = BatteryRefreshGate()
     private var loop: Task<Void, Never>?
     private var connectNotification: IOBluetoothUserNotification?
     private var disconnectNotifications: [String: IOBluetoothUserNotification] = [:]
@@ -52,7 +51,6 @@ final class BatteryMonitor: NSObject, ObservableObject {
 
     deinit {
         loop?.cancel()
-        delayedRefresh?.cancel()
         connectNotification?.unregister()
         disconnectNotifications.values.forEach { $0.unregister() }
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -75,27 +73,25 @@ final class BatteryMonitor: NSObject, ObservableObject {
 
     /// Reads all sources now, or right after the cycle in flight.
     func refresh() {
-        guard !cycleRunning else {
-            cyclePending = true
-            return
+        guard gate.request() else { return }
+        startCycle()
+    }
+
+    /// Refreshes after `delay` (e.g. while a device that just connected finishes coming up). Every call gets its own
+    /// deadline; reads that would overlap are coalesced by the gate.
+    func refresh(after delay: TimeInterval) {
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            self?.refresh()
         }
-        cycleRunning = true
+    }
+
+    private func startCycle() {
         // With the strip off, only the shared keyboard is still needed, and only while a controller is paired.
         let sources = enabled ? [keyboard] + others : (isPaired ? [keyboard] : [])
         queue.async {
             let readings = sources.flatMap { $0.read() }
             Task { @MainActor in await self.finishCycle(readings) }
-        }
-    }
-
-    /// Refreshes once after `delay` (e.g. while a device that just connected finishes coming up); further calls
-    /// before then are folded into that one.
-    func refresh(after delay: TimeInterval) {
-        guard delayedRefresh == nil else { return }
-        delayedRefresh = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            self?.delayedRefresh = nil
-            self?.refresh()
         }
     }
 
@@ -106,11 +102,7 @@ final class BatteryMonitor: NSObject, ObservableObject {
         publish()
         remote = await exchange(shared: readings.filter { $0.deviceId == BatteryIds.sharedKeyboard })
         publish()
-        cycleRunning = false
-        if cyclePending {
-            cyclePending = false
-            refresh()
-        }
+        if gate.finish() { startCycle() }
     }
 
     /// Posts this Mac's keyboard reading and fetches the one Windows has. A skipped or failed fetch is `[]`, so the
