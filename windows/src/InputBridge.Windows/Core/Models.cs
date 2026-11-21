@@ -20,6 +20,7 @@ public sealed class AppSettings
     public string CameraDeviceId { get; set; } = "";
     public bool KeyboardSwitchEnabled { get; set; } = true;
     public string KeyboardNamePattern { get; set; } = "G915|G913";
+    public bool BatteryIndicatorsEnabled { get; set; } = true;
     public bool AutoCheckUpdates { get; set; } = true;
     public bool AutoInstallUpdates { get; set; }
     /// <summary>Null until the user chooses; then defaults to true only on beta builds.</summary>

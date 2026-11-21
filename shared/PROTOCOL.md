@@ -94,3 +94,12 @@ uint32 big-endian length | JPEG bytes | uint32 length | JPEG bytes | ...
 ```
 
 Applying `mac` starts capture of the configured Windows USB camera at 1080p. Applying `windows` stops capture so local Windows apps can use the camera again.
+
+## Battery sharing
+
+Battery readings use the JSON shape in `shared/fixtures/battery-readings.json`: `{ "readings": [ { "deviceId", "name", "kind", "components": [ { "role", "percent", "charging" } ], "readAt" } ] }` with camelCase keys, lowercase enum strings (`kind`: `keyboard|mouse|headset|trackpad|other`; `role`: `main|left|right|case`) and an ISO 8601 `readAt`.
+
+Both endpoints require `Authorization: Bearer <pairing-token>` and a private-network caller (otherwise `401` / `403`).
+
+- `GET /api/battery` returns the readings Windows has for the shared keyboard (`deviceId` `logitech-keyboard`), so the Mac can show it while the keyboard sits on the LIGHTSPEED receiver.
+- `POST /api/battery` pushes the keyboard reading the Mac read over Bluetooth, in the same shape. Windows keeps only `logitech-keyboard`, replaces its previous remote set (an empty list clears it), shows it only while no local reading exists for that id, and drops it after 11 minutes without a refresh. Response `{"ok":true}`; malformed JSON gives `400`; bodies over 16 KB give `413`.

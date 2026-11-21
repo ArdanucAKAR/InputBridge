@@ -13,11 +13,13 @@ public sealed class AppRuntime
     private static readonly TimeSpan KeyboardRequestLifetime = TimeSpan.FromSeconds(15);
     private DiscoveryResponder? _discovery;
     private int _stopped;
+    private readonly CancellationTokenSource _batteryCancel = new();
 
     public AppSettings Settings { get; }
     public PairingService PairingService { get; }
     public CameraCaptureService Camera => _camera;
     public UpdateService Updates { get; }
+    public BatteryService Battery { get; }
     public string Status { get; private set; } = "Starting…";
     public event Action? PairingsChanged;
     public event Action? StatusChanged;
@@ -28,6 +30,10 @@ public sealed class AppRuntime
         PairingService = new PairingService(Settings, _store);
         PairingService.Changed += () => PairingsChanged?.Invoke();
         Updates = new UpdateService(Settings);
+        Battery = new BatteryService(
+            [new LogitechBatterySource(KeyboardPattern)],
+            () => Settings.BatteryIndicatorsEnabled,
+            TimeProvider.System);
     }
 
     public async Task StartAsync()
@@ -37,6 +43,7 @@ public sealed class AppRuntime
         await _server.StartAsync();
         await _discovery.StartAsync();
         Updates.Start();
+        await Battery.StartAsync(_batteryCancel.Token);
         SetStatus($"Ready. Waiting for paired Macs on HTTP {Settings.HttpPort}.");
     }
 
@@ -55,6 +62,8 @@ public sealed class AppRuntime
         if (System.Threading.Interlocked.Exchange(ref _stopped, 1) != 0) return;
 
         Updates.Dispose();
+        _batteryCancel.Cancel();
+        await Battery.DisposeAsync();
 
         if (_discovery is not null)
         {
@@ -112,6 +121,13 @@ public sealed class AppRuntime
         Settings.CameraDeviceId = deviceId;
         _store.Save(Settings);
         SetStatus(enabled ? "Camera share enabled." : "Camera share disabled.");
+    }
+
+    public void SaveBatterySettings(bool enabled)
+    {
+        Settings.BatteryIndicatorsEnabled = enabled;
+        _store.Save(Settings);
+        Battery.Refresh();
     }
 
     public async Task<List<MonitorActionResult>> ApplyProfileAsync(ProfileMode profile, ProfileSource source = ProfileSource.Local)

@@ -80,6 +80,40 @@ public sealed class ControllerServer : IAsyncDisposable
             return Results.Ok(new { ok = true, target = target?.ToString().ToLowerInvariant() });
         });
 
+        _app.MapGet("/api/battery", (HttpContext ctx) =>
+        {
+            if (!NetworkPolicy.IsPrivateOrLoopback(ctx.Connection.RemoteIpAddress)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (!TryAuthorize(ctx, _runtime.PairingService)) return Results.Unauthorized();
+            return Results.Content(BatteryWire.Serialize(_runtime.Battery.LocalShared()), "application/json");
+        });
+
+        // The Mac pushes the keyboard battery it read over Bluetooth while the keyboard is on its side.
+        _app.MapPost("/api/battery", async (HttpContext ctx) =>
+        {
+            if (!NetworkPolicy.IsPrivateOrLoopback(ctx.Connection.RemoteIpAddress)) return Results.StatusCode(StatusCodes.Status403Forbidden);
+            if (!TryAuthorize(ctx, _runtime.PairingService)) return Results.Unauthorized();
+            const int limit = 16 * 1024;
+            if (ctx.Request.ContentLength > limit) return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            try
+            {
+                using var buffer = new System.IO.MemoryStream();
+                var chunk = new byte[4096];
+                int read;
+                while ((read = await ctx.Request.Body.ReadAsync(chunk)) > 0)
+                {
+                    buffer.Write(chunk, 0, read);
+                    if (buffer.Length > limit) return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+                }
+                var readings = BatteryWire.Deserialize(System.Text.Encoding.UTF8.GetString(buffer.ToArray()));
+                _runtime.Battery.SetRemote(readings);
+                return Results.Ok(new { ok = true });
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return Results.BadRequest(new { ok = false, error = "Malformed battery payload." });
+            }
+        });
+
         _app.MapGet("/api/camera/status", (HttpContext ctx) =>
         {
             if (!NetworkPolicy.IsPrivateOrLoopback(ctx.Connection.RemoteIpAddress)) return Results.StatusCode(StatusCodes.Status403Forbidden);
