@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace InputBridge.Windows;
@@ -131,6 +130,7 @@ public sealed class LogitechBatterySource : IBatterySource
             var receiver = OpenReceiver(key, shortPath, longPath, token);
             if (receiver is null) continue;
             lock (_lock) _receivers[key] = receiver;
+            WatchForRemoval(receiver);
             added.Add(receiver);
         }
         await Task.WhenAll(added.Select(receiver => InitialiseAsync(receiver, token)));
@@ -154,6 +154,24 @@ public sealed class LogitechBatterySource : IBatterySource
         Log($"receiver opened: {key}");
         return receiver;
     }
+
+    /// <summary>
+    /// A channel's read loop ends on its own when the receiver is unplugged (or the handle goes stale, e.g. across
+    /// sleep): drop the receiver at once so its devices disappear, and let the next tick reopen it if it is back.
+    /// </summary>
+    private void WatchForRemoval(Receiver receiver) =>
+        _ = Task.WhenAny(receiver.Short.Completion, receiver.Long.Completion).ContinueWith(_ =>
+        {
+            lock (_lock)
+            {
+                // Already gone when the source disposed it itself (rescan or shutdown).
+                if (!_receivers.TryGetValue(receiver.Key, out var current) || !ReferenceEquals(current, receiver)) return;
+                _receivers.Remove(receiver.Key);
+                receiver.Dispose();
+            }
+            Log($"receiver closed: {receiver.Key}");
+            RaiseChanged();
+        }, TaskScheduler.Default);
 
     private async Task InitialiseAsync(Receiver receiver, CancellationToken token)
     {
@@ -317,21 +335,22 @@ public sealed class LogitechBatterySource : IBatterySource
     /// <summary>Name and type (DEVICE_NAME 0x0005) and the first battery feature the device supports.</summary>
     private static async Task<LogitechDeviceInfo?> DiscoverAsync(HidppChannel channel, byte index, CancellationToken token)
     {
-        var nameFeature = await FeatureIndexAsync(channel, index, FeatureDeviceName, token);
+        HidppDeviceRequest request = (feature, function, parameters) => RequestAsync(channel, index, feature, function, parameters, token);
+        var nameFeature = await HidppDeviceQueries.FeatureIndexAsync(request, FeatureDeviceName);
         if (nameFeature is null) return null;
-        var name = await DeviceNameAsync(channel, index, nameFeature.Value, token);
+        var name = await HidppDeviceQueries.DeviceNameAsync(request, nameFeature.Value);
         if (string.IsNullOrEmpty(name)) return null;
-        var type = await RequestAsync(channel, index, nameFeature.Value, 2, [], token);
+        var type = await request(nameFeature.Value, 2, []);
         var kind = type is { Length: > 0 } ? HidppBattery.KindFromHidppType(type[0]) : DeviceKind.Other;
 
         foreach (var feature in BatteryFeatures)
         {
-            var featureIndex = await FeatureIndexAsync(channel, index, feature, token);
+            var featureIndex = await HidppDeviceQueries.FeatureIndexAsync(request, feature);
             if (featureIndex is null) continue;
             var soc = false;
             if (feature == HidppBattery.FeatureUnifiedBattery)
             {
-                var capabilities = await RequestAsync(channel, index, featureIndex.Value, 0, [], token);
+                var capabilities = await request(featureIndex.Value, 0, []);
                 soc = capabilities is not null && HidppBattery.ParseUnifiedCapabilities(capabilities);
             }
             return new LogitechDeviceInfo(name, kind, feature, featureIndex.Value, soc);
@@ -346,30 +365,6 @@ public sealed class LogitechBatterySource : IBatterySource
         HidppBattery.FeatureBatteryVoltage => HidppBattery.ParseVoltage(parameters),
         _ => null,
     };
-
-    /// <summary>ROOT.getFeature; null when the device does not answer or lacks the feature.</summary>
-    private static async Task<byte?> FeatureIndexAsync(HidppChannel channel, byte index, ushort feature, CancellationToken token)
-    {
-        var reply = await RequestAsync(channel, index, 0x00, 0, [(byte)(feature >> 8), (byte)feature], token);
-        return reply is { Length: > 0 } && reply[0] != 0 ? reply[0] : null;
-    }
-
-    private static async Task<string?> DeviceNameAsync(HidppChannel channel, byte index, byte feature, CancellationToken token)
-    {
-        var count = await RequestAsync(channel, index, feature, 0, [], token);
-        if (count is not { Length: > 0 }) return null;
-        var length = count[0];
-        var name = new StringBuilder();
-        while (name.Length < length)
-        {
-            var chunk = await RequestAsync(channel, index, feature, 1, [(byte)name.Length], token);
-            if (chunk is null) return null;
-            var text = Encoding.ASCII.GetString(chunk).TrimEnd('\0');
-            if (text.Length == 0) break;
-            name.Append(text);
-        }
-        return name.ToString()[..Math.Min(name.Length, length)];
-    }
 
     /// <summary>One HID++ request under the shared gate, so a profile switch waits for at most this one request.</summary>
     private static async Task<byte[]?> RequestAsync(HidppChannel channel, byte index, byte feature, byte function, byte[] parameters, CancellationToken token)

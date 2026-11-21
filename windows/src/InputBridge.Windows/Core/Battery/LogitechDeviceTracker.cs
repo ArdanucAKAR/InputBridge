@@ -48,10 +48,13 @@ internal sealed class LogitechDeviceTracker
     /// <summary>The discovered device in the slot, or null before discovery.</summary>
     public LogitechDeviceInfo? Info(byte index) => _slots.TryGetValue(index, out var slot) ? slot.Info : null;
 
-    /// <summary>Online devices whose last reading (or last read attempt) is at least 30 minutes old.</summary>
+    /// <summary>
+    /// Online devices whose last reading or last read attempt is at least 30 minutes old. This includes a device whose
+    /// first read failed: it is known to be online, so it is retried every 30 minutes rather than left blank until it re-links.
+    /// </summary>
     public IReadOnlyList<byte> DueForRefresh(DateTimeOffset now) =>
-        _slots.Where(pair => pair.Value.Linked && pair.Value.Battery is { } battery &&
-                             now - Max(battery.At, pair.Value.LastAttempt) >= RefreshInterval)
+        _slots.Where(pair => pair.Value.Linked && Latest(pair.Value.Battery?.At, pair.Value.LastAttempt) is { } last &&
+                             now - last >= RefreshInterval)
             .Select(pair => pair.Key)
             .ToList();
 
@@ -68,7 +71,7 @@ internal sealed class LogitechDeviceTracker
             })
             .ToList();
 
-    private static DateTimeOffset Max(DateTimeOffset a, DateTimeOffset? b) => b is { } value && value > a ? value : a;
+    private static DateTimeOffset? Latest(DateTimeOffset? a, DateTimeOffset? b) => a is null ? b : b is null ? a : a > b ? a : b;
 
     private Slot SlotFor(byte index)
     {

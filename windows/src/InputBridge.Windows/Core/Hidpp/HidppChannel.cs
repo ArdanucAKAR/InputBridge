@@ -26,11 +26,12 @@ internal sealed class HidppChannel : IDisposable
     private readonly CancellationTokenSource _readCancel = new();
     private readonly object _lock = new();
     private readonly SemaphoreSlim _requestGate = new(1, 1);
+    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource<byte[]>? _pending;
     private Func<byte[], bool>? _matches;
     private Action<byte[]>? _collector;
 
-    private HidppChannel(string path, FileStream stream, int reportLength, byte softwareId)
+    internal HidppChannel(string path, FileStream stream, int reportLength, byte softwareId)
     {
         Path = path;
         _stream = stream;
@@ -42,6 +43,12 @@ internal sealed class HidppChannel : IDisposable
     public string Path { get; }
 
     public int ReportLength { get; }
+
+    /// <summary>
+    /// Completes when the read loop stops: after <see cref="Dispose"/>, or on its own when the device was removed
+    /// (no further reports will arrive and requests will fail).
+    /// </summary>
+    public Task Completion => _completion.Task;
 
     /// <summary>
     /// Raised for every input report, whatever its report id. Handlers run on the read-loop thread
@@ -186,6 +193,10 @@ internal sealed class HidppChannel : IDisposable
         catch
         {
             // Closed or device removed.
+        }
+        finally
+        {
+            _completion.TrySetResult();
         }
     }
 

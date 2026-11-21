@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace InputBridge.Windows;
@@ -89,41 +88,21 @@ public static class LogitechKeyboard
 
     private static async Task<KeyboardHostState?> QueryAsync(HidppChannel channel, byte index, Regex namePattern, CancellationToken token)
     {
+        // The caller holds HidppGate for the whole conversation, so requests go straight to the channel.
+        HidppDeviceRequest request = (feature, function, parameters) => channel.RequestAsync(index, feature, function, parameters, token);
+
         // ROOT.getFeature(DEVICE_NAME) doubles as a ping: offline slots simply do not answer.
-        var nameFeature = await GetFeatureIndexAsync(channel, index, FeatureDeviceName, token);
+        var nameFeature = await HidppDeviceQueries.FeatureIndexAsync(request, FeatureDeviceName);
         if (nameFeature is null or 0) return null;
 
-        var name = await GetDeviceNameAsync(channel, index, nameFeature.Value, token);
+        var name = await HidppDeviceQueries.DeviceNameAsync(request, nameFeature.Value);
         if (name is null || !namePattern.IsMatch(name)) return null;
 
-        var changeHost = await GetFeatureIndexAsync(channel, index, FeatureChangeHost, token);
+        var changeHost = await HidppDeviceQueries.FeatureIndexAsync(request, FeatureChangeHost);
         if (changeHost is null or 0) return null;
 
         var info = await channel.RequestAsync(index, changeHost.Value, 0, [], token);
         if (info is null) return null;
         return new KeyboardHostState(name, index, changeHost.Value, info[0], info[1]);
-    }
-
-    private static async Task<byte?> GetFeatureIndexAsync(HidppChannel channel, byte index, ushort feature, CancellationToken token)
-    {
-        var reply = await channel.RequestAsync(index, 0x00, 0, [(byte)(feature >> 8), (byte)feature], token);
-        return reply?[0];
-    }
-
-    private static async Task<string?> GetDeviceNameAsync(HidppChannel channel, byte index, byte feature, CancellationToken token)
-    {
-        var count = await channel.RequestAsync(index, feature, 0, [], token);
-        if (count is null) return null;
-        var length = count[0];
-        var name = new StringBuilder();
-        while (name.Length < length)
-        {
-            var chunk = await channel.RequestAsync(index, feature, 1, [(byte)name.Length], token);
-            if (chunk is null) return null;
-            var text = Encoding.ASCII.GetString(chunk).TrimEnd('\0');
-            if (text.Length == 0) break;
-            name.Append(text);
-        }
-        return name.ToString()[..Math.Min(name.Length, length)];
     }
 }

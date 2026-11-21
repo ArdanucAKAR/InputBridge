@@ -65,6 +65,17 @@ public class LogitechTrackerTests
         Assert.Equal([(byte)1], t.DueForRefresh(t0.AddMinutes(60)));
     }
 
+    [Fact] public void Tracker_LinkedWithoutReadingRetriedAfter30Min()
+    {
+        var t = new LogitechDeviceTracker(); var t0 = DateTimeOffset.UtcNow;
+        t.OnLinked(1);
+        t.OnReadAttempt(1, t0);                          // first read got no answer: no value, still online
+        Assert.Empty(t.DueForRefresh(t0.AddMinutes(29)));
+        Assert.Equal([(byte)1], t.DueForRefresh(t0.AddMinutes(30)));
+        t.OnLinkLost(1);
+        Assert.Empty(t.DueForRefresh(t0.AddHours(2)));
+    }
+
     [Fact] public void RegisterReply_ReturnsFlagBytes() =>
         Assert.Equal(new byte[]{0x10,0x08,0x00}, HidppReceiverNotifications.ParseNotificationFlagsReply([0x10,0xFF,0x81,0x00,0x10,0x08,0x00]));
     [Fact] public void RegisterReply_OtherRegisterIsNull() =>
