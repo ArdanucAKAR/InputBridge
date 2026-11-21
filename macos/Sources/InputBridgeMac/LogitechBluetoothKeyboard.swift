@@ -35,26 +35,17 @@ enum LogitechBluetoothKeyboard {
     private static let hidppUsagePage = 0xFF43
     private static let hidppUsage = 0x0202
     private static let changeHostFeature: UInt16 = 0x1814
+    /// Distinct from the keyboard switch's 0x0B so battery replies can never be taken for switch replies.
+    private static let batterySoftwareID: UInt8 = 0x0C
+    /// Same order as the Windows reader: the first one the keyboard supports is used.
+    private static let batteryFeatures: [UInt16] = [
+        HIDPPBattery.featureUnifiedBattery, HIDPPBattery.featureBatteryStatus, HIDPPBattery.featureBatteryVoltage
+    ]
 
     /// Blocking; call it off the main thread.
     /// Returns the keyboard name when it was switched, or nil when no matching keyboard is connected over Bluetooth.
     static func switchAwayFromBluetooth(namePattern: NSRegularExpression) throws -> String? {
-        let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
-        let matching: [String: Any] = [
-            kIOHIDVendorIDKey as String: vendorID,
-            kIOHIDDeviceUsagePageKey as String: hidppUsagePage,
-            kIOHIDDeviceUsageKey as String: hidppUsage
-        ]
-        IOHIDManagerSetDeviceMatching(manager, matching as CFDictionary)
-        _ = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
-        defer { IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone)) }
-
-        guard let devices = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> else { return nil }
-        for device in devices {
-            let name = IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String ?? ""
-            let range = NSRange(name.startIndex..<name.endIndex, in: name)
-            guard namePattern.firstMatch(in: name, options: [], range: range) != nil else { continue }
-
+        try withMatchingKeyboard(namePattern: namePattern) { (device, name) -> String? in
             let session = try HIDPPSession(device: device)
             defer { session.close() }
 
@@ -71,88 +62,71 @@ enum LogitechBluetoothKeyboard {
             try session.send(feature: feature, function: 1, parameters: [info[1] == 0 ? 1 : 0])
             return name
         }
+    }
+
+    /// Blocking; call it off the main thread.
+    /// Reads the battery of the matching keyboard while it is connected to this Mac over Bluetooth; nil when it is not
+    /// connected here or exposes no battery feature. Never shows a permission prompt: throws
+    /// `inputMonitoringRequired` when Input Monitoring is not granted.
+    static func batteryReading(namePattern: NSRegularExpression) throws -> BatteryReading? {
+        // Checked before opening anything, so no IOHID call can make macOS ask for the permission.
+        guard IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) == kIOHIDAccessTypeGranted else {
+            throw KeyboardError.inputMonitoringRequired
+        }
+        return try withMatchingKeyboard(namePattern: namePattern) { (device, name) -> BatteryReading? in
+            let session = try HIDPPSession(device: device, softwareID: batterySoftwareID, requestAccessIfDenied: false)
+            defer { session.close() }
+
+            for feature in batteryFeatures {
+                let index = try session.request(
+                    feature: 0x00, function: 0,
+                    parameters: [UInt8(feature >> 8), UInt8(feature & 0xFF)]
+                )[0]
+                guard index != 0 else { continue }
+
+                let parsed: BatteryComponent?
+                if feature == HIDPPBattery.featureUnifiedBattery {
+                    // get_capabilities (fn 0), then get_status (fn 1).
+                    let capabilities = try? session.request(feature: index, function: 0, parameters: [])
+                    let stateOfCharge = capabilities.map(HIDPPBattery.parseUnifiedCapabilities) ?? false
+                    let status = try session.request(feature: index, function: 1, parameters: [])
+                    parsed = HIDPPBattery.parseUnifiedStatus(status, stateOfChargeSupported: stateOfCharge)
+                } else if feature == HIDPPBattery.featureBatteryStatus {
+                    parsed = try HIDPPBattery.parseBatteryStatus(session.request(feature: index, function: 0, parameters: []))
+                } else {
+                    parsed = try HIDPPBattery.parseVoltage(session.request(feature: index, function: 0, parameters: []))
+                }
+                guard let component = parsed else { return nil }
+                return BatteryReading(
+                    deviceId: BatteryIds.sharedKeyboard, name: name, kind: .keyboard,
+                    components: [component], readAt: Date())
+            }
+            return nil
+        }
+    }
+
+    /// Runs `body` with the first connected HID++ collection whose product name matches; nil when there is none.
+    private static func withMatchingKeyboard<T>(
+        namePattern: NSRegularExpression,
+        _ body: (IOHIDDevice, String) throws -> T?
+    ) rethrows -> T? {
+        let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
+        let matching: [String: Any] = [
+            kIOHIDVendorIDKey as String: vendorID,
+            kIOHIDDeviceUsagePageKey as String: hidppUsagePage,
+            kIOHIDDeviceUsageKey as String: hidppUsage
+        ]
+        IOHIDManagerSetDeviceMatching(manager, matching as CFDictionary)
+        _ = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        defer { IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone)) }
+
+        guard let devices = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> else { return nil }
+        for device in devices {
+            let name = IOHIDDeviceGetProperty(device, kIOHIDProductKey as CFString) as? String ?? ""
+            let range = NSRange(name.startIndex..<name.endIndex, in: name)
+            guard namePattern.firstMatch(in: name, options: [], range: range) != nil else { continue }
+            return try body(device, name)
+        }
         return nil
-    }
-}
-
-/// HID++ 2.0 over the keyboard's Bluetooth vendor collection (device index 0xFF, long reports 0x11).
-private final class HIDPPSession {
-    private static let longReportID: UInt8 = 0x11
-    private static let deviceIndex: UInt8 = 0xFF
-    private static let softwareID: UInt8 = 0x0B
-    private static let reportLength = 20
-    private static let notPermitted = IOReturn(bitPattern: 0xE000_02E2)
-
-    private let device: IOHIDDevice
-    private let buffer: UnsafeMutablePointer<UInt8>
-    private let bufferSize = 64
-    private let runLoop: CFRunLoop
-    private var reports: [[UInt8]] = []
-
-    init(device: IOHIDDevice) throws {
-        self.device = device
-        buffer = .allocate(capacity: 64)
-        runLoop = CFRunLoopGetCurrent()
-
-        let result = IOHIDDeviceOpen(device, IOOptionBits(kIOHIDOptionsTypeNone))
-        guard result == kIOReturnSuccess else {
-            buffer.deallocate()
-            if result == Self.notPermitted {
-                _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
-                throw LogitechBluetoothKeyboard.KeyboardError.inputMonitoringRequired
-            }
-            throw LogitechBluetoothKeyboard.KeyboardError.openFailed(result)
-        }
-
-        IOHIDDeviceScheduleWithRunLoop(device, runLoop, CFRunLoopMode.defaultMode.rawValue)
-        IOHIDDeviceRegisterInputReportCallback(device, buffer, bufferSize, { context, _, _, _, _, report, length in
-            guard let context else { return }
-            let session = Unmanaged<HIDPPSession>.fromOpaque(context).takeUnretainedValue()
-            session.reports.append(Array(UnsafeBufferPointer(start: report, count: length)))
-        }, Unmanaged.passUnretained(self).toOpaque())
-    }
-
-    func send(feature: UInt8, function: UInt8, parameters: [UInt8]) throws {
-        var report = [UInt8](repeating: 0, count: Self.reportLength)
-        report[0] = Self.longReportID
-        report[1] = Self.deviceIndex
-        report[2] = feature
-        report[3] = (function << 4) | Self.softwareID
-        for (offset, value) in parameters.prefix(Self.reportLength - 4).enumerated() {
-            report[4 + offset] = value
-        }
-        let result = IOHIDDeviceSetReport(device, kIOHIDReportTypeOutput, CFIndex(Self.longReportID), report, report.count)
-        guard result == kIOReturnSuccess else { throw LogitechBluetoothKeyboard.KeyboardError.writeFailed(result) }
-    }
-
-    /// Sends a request and returns the reply parameters.
-    func request(feature: UInt8, function: UInt8, parameters: [UInt8], timeout: TimeInterval = 2) throws -> [UInt8] {
-        let functionByte = (function << 4) | Self.softwareID
-        reports.removeAll()
-        try send(feature: feature, function: function, parameters: parameters)
-
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            _ = CFRunLoopRunInMode(CFRunLoopMode.defaultMode, 0.05, true)
-            for raw in reports {
-                // Normalise: some paths deliver the report without its ID byte.
-                let report = raw.first == Self.longReportID ? raw : [Self.longReportID] + raw
-                guard report.count >= 5, report[1] == Self.deviceIndex else { continue }
-                if report[2] == feature && report[3] == functionByte {
-                    return Array(report[4...])
-                }
-                if report[2] == 0xFF && report[3] == feature && report[4] == functionByte {
-                    throw LogitechBluetoothKeyboard.KeyboardError.hidppError(report.count > 5 ? report[5] : 0)
-                }
-            }
-        }
-        throw LogitechBluetoothKeyboard.KeyboardError.noReply
-    }
-
-    func close() {
-        IOHIDDeviceRegisterInputReportCallback(device, buffer, bufferSize, nil, nil)
-        IOHIDDeviceUnscheduleFromRunLoop(device, runLoop, CFRunLoopMode.defaultMode.rawValue)
-        IOHIDDeviceClose(device, IOOptionBits(kIOHIDOptionsTypeNone))
-        buffer.deallocate()
     }
 }
