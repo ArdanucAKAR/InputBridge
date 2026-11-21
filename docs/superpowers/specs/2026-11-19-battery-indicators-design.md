@@ -1,6 +1,6 @@
 # Cihaz pil göstergeleri — tasarım
 
-Tarih: 2026-11-19 · Durum: onay bekliyor
+Tarih: 2026-11-19 · Durum: onaylandı, uygulandı (feature/battery-indicators)
 
 ## Amaç ve neden
 
