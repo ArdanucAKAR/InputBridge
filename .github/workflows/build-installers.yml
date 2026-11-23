@@ -81,6 +81,8 @@ jobs:
   macos:
     needs: metadata
     runs-on: macos-15
+    # A normal signed and notarized build takes a few minutes; fail instead of hanging for hours.
+    timeout-minutes: 75
     env:
       # Signing and notarization run only when these secrets exist (they are not passed to forks),
       # otherwise the job falls back to an ad-hoc signed build. See docs/RELEASING_TR.md.

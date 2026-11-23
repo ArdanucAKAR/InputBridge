@@ -154,15 +154,45 @@ else
   productbuild --package "$COMPONENT_PKG" "$PKG"
 fi
 
+# Runs a command, killing it after the given number of seconds (macOS has no `timeout`).
+# Exits 124 on timeout, otherwise with the command's own status.
+run_limited() {
+  perl -e '
+    my $s = shift @ARGV;
+    my $pid = fork() // die "fork failed: $!\n";
+    if (!$pid) { exec @ARGV or die "exec failed: $!\n"; }
+    $SIG{ALRM} = sub { print STDERR "Timed out after ${s}s: $ARGV[0] $ARGV[1] $ARGV[2]\n"; kill "TERM", $pid; sleep 5; kill "KILL", $pid; exit 124; };
+    alarm $s;
+    waitpid($pid, 0);
+    exit($? & 127 ? 128 + ($? & 127) : $? >> 8);
+  ' "$@"
+}
+
 notarize() {
-  local file="$1" result="$BUILD/notary-${1:t}.json"
-  xcrun notarytool submit "$file" "${NOTARY_AUTH[@]}" --wait --timeout 30m --output-format json | tee "$result"
+  local file="$1" submit="$BUILD/notary-submit-${1:t}.json" result="$BUILD/notary-${1:t}.json"
+  # Upload and wait are separate steps: `submit --wait --timeout` only limits the wait, and an
+  # upload that stalls hangs forever with no output (it once held a release for 90 minutes).
+  local notary_id="" upload
+  for upload in 1 2 3; do
+    echo "Uploading ${file:t} for notarization (attempt $upload)…"
+    if run_limited 600 xcrun notarytool submit "$file" "${NOTARY_AUTH[@]}" --no-wait --output-format json > "$submit"; then
+      notary_id=$(plutil -extract id raw "$submit" 2>/dev/null || echo "")
+      [[ -n "$notary_id" ]] && break
+    fi
+    cat "$submit" 2>/dev/null || true
+    echo "::warning::Notarization upload of ${file:t} failed or timed out (attempt $upload)."
+    if [[ $upload == 3 ]]; then
+      echo "Could not submit ${file:t} for notarization." >&2
+      exit 1
+    fi
+    sleep $((upload * 30))
+  done
+  echo "Submitted ${file:t} as $notary_id; waiting for Apple…"
+  run_limited 2100 xcrun notarytool wait "$notary_id" "${NOTARY_AUTH[@]}" --timeout 30m --output-format json | tee "$result" || true
   local notary_status
   notary_status=$(plutil -extract status raw "$result" 2>/dev/null || echo unknown)
   if [[ "$notary_status" != "Accepted" ]]; then
-    local notary_id
-    notary_id=$(plutil -extract id raw "$result" 2>/dev/null || echo "")
-    [[ -n "$notary_id" ]] && xcrun notarytool log "$notary_id" "${NOTARY_AUTH[@]}" || true
+    xcrun notarytool log "$notary_id" "${NOTARY_AUTH[@]}" || true
     echo "Notarization of ${file:t} failed with status: $notary_status" >&2
     exit 1
   fi
