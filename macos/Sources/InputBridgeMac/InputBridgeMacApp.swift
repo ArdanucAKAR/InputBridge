@@ -381,7 +381,7 @@ private struct ControllerPane: View {
                                 .frame(width: 30)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(offer.name).fontWeight(.medium)
-                                Text("\(offer.host):\(offer.httpPort)")
+                                Text(verbatim: "\(offer.host):\(offer.httpPort)") // verbatim: no locale grouping (41.715)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -504,7 +504,22 @@ private struct CameraPane: View {
             Section {
                 Toggle("Use the Windows camera on this Mac", isOn: $model.cameraShareEnabled)
             } footer: {
-                Text("While the Mac profile is active, the USB camera attached to Windows streams to “InputBridge Camera”. The camera stays plugged into Windows.")
+                Text("While the Mac profile is active, the USB camera attached to Windows streams to “InputBridge Camera”. The camera stays plugged into Windows and turns on only while an app on this Mac uses “InputBridge Camera”.")
+            }
+
+            Section {
+                if model.cameraAccessDenied {
+                    LabeledContent("Camera access") {
+                        Button("Allow in System Settings…") { model.openCameraPrivacySettings() }
+                    }
+                    Text("macOS hides InputBridge Camera from InputBridge until it may use the camera. InputBridge never turns a camera on by itself. Quit and reopen InputBridge after allowing it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                LabeledContent("In use on this Mac") {
+                    Text(model.cameraInUse ? "Yes — the Windows camera is on" : "No — the Windows camera is off")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {
@@ -513,14 +528,20 @@ private struct CameraPane: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.trailing)
                 }
-                HStack {
-                    Spacer()
-                    Button("Install camera extension") { installer.activate() }
+                if installer.state != .installed && installer.state != .activating {
+                    HStack {
+                        Spacer()
+                        if installer.state == .needsApproval {
+                            Button("Open System Settings") { installer.openApprovalSettings() }
+                        } else {
+                            Button("Install camera extension") { installer.activate() }
+                        }
+                    }
                 }
             } header: {
                 Text("InputBridge Camera")
             } footer: {
-                Text("After installing, choose “InputBridge Camera” once in Zoom, Meet or FaceTime. Requires a signed build.")
+                Text("After installing, choose “InputBridge Camera” once in Zoom, Meet or FaceTime.")
             }
 
             Section {

@@ -16,7 +16,11 @@ public sealed class AppSettings
     public string DiscoveryMulticastGroup { get; set; } = "239.255.77.77";
     public List<MonitorProfileSetting> Monitors { get; set; } = [];
     public List<TrustedClient> TrustedClients { get; set; } = [];
-    public bool CameraShareEnabled { get; set; }
+    /// <summary>
+    /// On for new installs: the camera only turns on while the paired (user-approved) Mac uses
+    /// InputBridge Camera. Existing settings files keep their saved value.
+    /// </summary>
+    public bool CameraShareEnabled { get; set; } = true;
     public string CameraDeviceId { get; set; } = "";
     public bool KeyboardSwitchEnabled { get; set; } = true;
     public string KeyboardNamePattern { get; set; } = "G915|G913";

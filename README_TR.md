@@ -40,11 +40,11 @@ Mac uygulaması Windows Controller'ı multicast discovery ile bulur. Windows'un 
    - `0x0F`: DisplayPort 1
    - `0x11`: HDMI 1
    - `0x12`: HDMI 2
-4. Mac'e `InputBridge-macOS.dmg` içindeki uygulamayı `/Applications` klasörüne taşı.
+4. Mac'te `InputBridge-macOS.pkg` dosyasını açıp kur. Yükleyici uygulamayı `/Applications` klasörüne koyar ve açar; kamera erişimi sorusuna **İzin Ver** de ve kamera için çıkan pencerede **Open System Settings** ile uzantıyı bir kez onayla.
 5. Mac uygulamasını aç, otomatik bulunan Windows Controller için **Pair** düğmesine bas.
 6. Windows uygulamasında pairing isteğini onayla.
 7. Mac uygulamasında Bluetooth izni ver; Z407 ve G915/G913 bağlı/pair edilmiş olsun.
-8. Kamerayı paylaşmak için Windows **Camera** sekmesinde share’i aç, Brio’yu seç, kaydet. Mac Setup’ta **Install camera extension** ile Sistem Ayarları’nda izin ver; Zoom/Meet’te bir kez **InputBridge Camera** seç.
+8. Kamera paylaşımı yeni kurulumlarda açık gelir; Windows **Camera** sekmesinde doğru kameranın seçili olduğunu kontrol et. Zoom/Meet/FaceTime'da bir kez **InputBridge Camera** seç. Kamera yalnızca Mac'te bir uygulama onu kullanırken açılır.
 9. İki uygulamada da otomatik başlatmayı aç.
 
 ### Pil göstergeleri (Windows)
@@ -89,7 +89,7 @@ Xcode'da `InputBridgeMac` scheme'ini çalıştır. Debug build'de Bluetooth ve y
 
 ## Release üretimi
 
-GitHub Actions Windows installer ve unsigned macOS DMG üretir.
+GitHub Actions Windows installer, macOS `.pkg` yükleyicisi ve macOS DMG üretir. Ayrıntılar: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ```bash
 git tag v0.2.0
@@ -99,9 +99,10 @@ git push origin v0.2.0
 Tag push edildiğinde workflow release asset'lerini oluşturur:
 
 - `InputBridge-Windows-Setup.exe`
-- `InputBridge-macOS.dmg`
+- `InputBridge-macOS.pkg` (yeni kurulumlar için)
+- `InputBridge-macOS.dmg` (uygulama içi güncelleme için)
 
-macOS DMG, Apple Developer ID ile imzalanıp notarize edilmezse Gatekeeper uyarısı gösterebilir. Yayın dağıtımında `docs/RELEASING_TR.md` içindeki signing/notarization adımlarını uygula.
+macOS `.pkg` ve DMG, Apple Developer ID ile imzalanıp notarize edilmezse Gatekeeper uyarısı gösterebilir. Yayın dağıtımında `docs/RELEASING_TR.md` içindeki signing/notarization adımlarını uygula.
 
 ## Otomatik güncelleme
 

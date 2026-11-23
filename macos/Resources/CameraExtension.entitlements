@@ -4,13 +4,14 @@
 <dict>
   <key>com.apple.security.app-sandbox</key>
   <true/>
+  <!-- CMIOExtensionMachServiceName must start with an app group the extension belongs to. -->
   <key>com.apple.security.application-groups</key>
   <array>
-    <string>group.com.inputbridge.mac</string>
+    <string>$(TeamIdentifierPrefix)com.inputbridge.mac.camera</string>
   </array>
-  <key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
-  <array>
-    <string>/tmp/com.inputbridge.camera/</string>
-  </array>
+  <!-- The extension pulls frames from the paired Windows controller itself. File temporary-exception
+       entitlements are not an option: the camera extension's sandbox profile fails to compile with them. -->
+  <key>com.apple.security.network.client</key>
+  <true/>
 </dict>
 </plist>
