@@ -88,7 +88,7 @@ targets:
       - path: Tests/InputBridgeMacTests
       - path: Sources/InputBridgeMac/Battery/BatteryModels.swift
       - path: Sources/InputBridgeMac/Battery/BatteryParsing.swift
-      - path: Sources/InputBridgeMac/Battery/BatteryStrip.swift
+      - path: Sources/InputBridgeMac/Battery/MenuBarColumns.swift
       - path: Sources/InputBridgeMac/Battery/BatteryOrder.swift
       - path: Sources/InputBridgeMac/Battery/BatterySource.swift
       - path: Sources/InputBridgeMac/Battery/BatteryRefreshGate.swift

@@ -24,6 +24,10 @@ final class AppModel: ObservableObject {
             battery.enabled = batteryIndicatorsEnabled
         }
     }
+    /// "Show AirPods left, right and case separately": off shows one column with the lower earbud.
+    @Published var airPodsSeparate = UserDefaults.standard.object(forKey: "battery-airpods-separate") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(airPodsSeparate, forKey: "battery-airpods-separate") }
+    }
     /// An app on this Mac (Zoom, Meet, FaceTime…) is streaming from InputBridge Camera.
     @Published private(set) var cameraInUse = false
     /// macOS only shows camera devices, InputBridge Camera included, to an app the user allowed to use the camera.
@@ -80,7 +84,10 @@ final class AppModel: ObservableObject {
             .removeDuplicates()
             .assign(to: &$updateAvailable)
         updates.start()
-        batteryStrip = battery.$visible.sink { [weak self] readings in self?.batteryItem.show(readings) }
+        batteryStrip = battery.$visible.combineLatest($airPodsSeparate).sink { [weak self] readings, separate in
+            let columns = MenuBarColumns.columns(readings, airPods: separate ? .separate : .combined)
+            self?.batteryItem.show(columns, tooltip: MenuBarColumns.tooltip(readings))
+        }
         battery.start()
     }
 

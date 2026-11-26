@@ -466,6 +466,8 @@ private struct DevicesPane: View {
 
             Section {
                 Toggle("Show battery levels", isOn: $model.batteryIndicatorsEnabled)
+                Toggle("Show AirPods left, right and case separately", isOn: $model.airPodsSeparate)
+                    .disabled(!model.batteryIndicatorsEnabled)
             } header: {
                 Text("Battery")
             } footer: {
