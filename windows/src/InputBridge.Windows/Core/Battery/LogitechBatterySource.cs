@@ -198,7 +198,9 @@ public sealed class LogitechBatterySource : IBatterySource
             var reported = await RegisterRequestAsync(receiver, HidppReceiverNotifications.ReportConnectedDevicesRequest(),
                 report => HidppReceiverNotifications.IsReportConnectedDevicesReply(report) ? report : null, token);
             Log($"{receiver.Key}: connected-devices report {(reported is null ? "not confirmed" : "requested")}");
-            if (!scan) return;
+            var isReceiver = reported is not null;
+            if (!isReceiver) Log($"{receiver.Key}: direct device");
+            if (!HidppCollectionPlan.ShouldScan(isReceiver, scan)) return;
 
             // The one allowed startup scan, kept as a fallback for receivers that do not answer the register query:
             // it wakes sleeping devices, so it runs once per receiver per app session.

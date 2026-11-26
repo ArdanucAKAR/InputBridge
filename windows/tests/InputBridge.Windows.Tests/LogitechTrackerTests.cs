@@ -37,6 +37,32 @@ public class LogitechTrackerTests
         Assert.Empty(t.Readings(kb));                 // nothing shown until the new value arrives
     }
 
+    [Fact] public void Tracker_SameDeviceOnSeveralSlots_ShownOnce()
+    {
+        var t = new LogitechDeviceTracker(); var now = DateTimeOffset.UtcNow;
+        foreach (byte slot in new byte[] { 3, 1, 2 })
+        {
+            t.OnLinked(slot);
+            t.OnDeviceInfo(slot, "G915 TKL LIGHTSPEED Wireless RGB Mechanical Gaming Keyboard", DeviceKind.Keyboard, 0x1001, 6, false);
+            t.OnBattery(slot, new(ComponentRole.Main, 98, true), now);
+        }
+        var reading = Assert.Single(t.Readings(new Regex("G915|G913", RegexOptions.IgnoreCase)));
+        Assert.Equal(BatteryIds.SharedKeyboard, reading.DeviceId);
+    }
+
+    [Fact] public void Tracker_DifferentDevicesOnSeveralSlots_AllShown()
+    {
+        var t = new LogitechDeviceTracker(); var now = DateTimeOffset.UtcNow;
+        (byte, string, DeviceKind)[] devices = [(1, "G915 TKL", DeviceKind.Keyboard), (2, "PRO X 2", DeviceKind.Mouse), (3, "PRO X 2", DeviceKind.Keyboard)];
+        foreach (var (slot, name, kind) in devices)
+        {
+            t.OnLinked(slot);
+            t.OnDeviceInfo(slot, name, kind, 0x1001, 6, false);
+            t.OnBattery(slot, new(ComponentRole.Main, 80, false), now);
+        }
+        Assert.Equal(3, t.Readings(new Regex("G915|G913", RegexOptions.IgnoreCase)).Count);
+    }
+
     [Fact] public void Tracker_RefreshOnlyOnlineAfter30Min()
     {
         var t = new LogitechDeviceTracker(); var t0 = DateTimeOffset.UtcNow;

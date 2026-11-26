@@ -61,10 +61,15 @@ internal sealed class LogitechDeviceTracker
             .Select(pair => pair.Key)
             .ToList();
 
-    /// <summary>Online devices with a reading; the shared keyboard gets <see cref="BatteryIds.SharedKeyboard"/>.</summary>
+    /// <summary>
+    /// Online devices with a reading; the shared keyboard gets <see cref="BatteryIds.SharedKeyboard"/>. A cabled device
+    /// answers on every slot, so one reading is kept per distinct name and kind, taken from the lowest slot.
+    /// </summary>
     public IReadOnlyList<BatteryReading> Readings(Regex sharedKeyboardPattern) =>
-        _slots.Values
+        _slots.Values   // ordered by slot index, so First() below is the lowest slot
             .Where(slot => slot.Linked && slot.Info is not null && slot.Battery is not null)
+            .GroupBy(slot => (slot.Info!.Name, slot.Info.Kind))
+            .Select(group => group.First())
             .Select(slot =>
             {
                 var info = slot.Info!;
