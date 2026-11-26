@@ -17,7 +17,7 @@ final class AppModel: ObservableObject {
     @Published var keyboardSwitchEnabled = UserDefaults.standard.object(forKey: "keyboard-switch-enabled") as? Bool ?? true
     @Published var manualHost = UserDefaults.standard.string(forKey: "manual-controller-host") ?? ""
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
-    /// "Show battery levels": shows the menu bar strip. While it is off, no battery is read.
+    /// "Show battery levels": shows the battery columns in the menu bar item. While it is off, no battery is read.
     @Published var batteryIndicatorsEnabled = UserDefaults.standard.object(forKey: "battery-indicators-enabled") as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(batteryIndicatorsEnabled, forKey: "battery-indicators-enabled")
@@ -32,8 +32,12 @@ final class AppModel: ObservableObject {
     @Published private(set) var cameraInUse = false
     /// macOS only shows camera devices, InputBridge Camera included, to an app the user allowed to use the camera.
     @Published private(set) var cameraAccessDenied = false
-    /// Mirrors `updates.state` so the menu bar label (driven by this model) can show the update badge.
+    /// Mirrors `updates.state` so the menu bar item (driven by this model) can show the update badge.
     @Published private(set) var updateAvailable = false
+    /// The menu bar item's battery columns, in display order. Empty with no readings or while the switch is off.
+    @Published private(set) var batteryColumns: [MenuBarColumn] = []
+    /// One line per device, for the menu bar item's tooltip. Empty with no readings or while the switch is off.
+    @Published private(set) var batteryTooltip = ""
 
     let discovery = DiscoveryService()
     let controller = ControllerClient()
@@ -54,8 +58,6 @@ final class AppModel: ObservableObject {
             AppleBatterySource(excluding: { AppModel.savedKeyboardPattern() }),
         ],
         enabled: batteryIndicatorsEnabled)
-    private let batteryItem = BatteryStatusItem()
-    private var batteryStrip: AnyCancellable?
 
     init() {
         discovery.start()
@@ -84,10 +86,15 @@ final class AppModel: ObservableObject {
             .removeDuplicates()
             .assign(to: &$updateAvailable)
         updates.start()
-        batteryStrip = battery.$visible.combineLatest($airPodsSeparate).sink { [weak self] readings, separate in
-            let columns = MenuBarColumns.columns(readings, airPods: separate ? .separate : .combined)
-            self?.batteryItem.show(columns, tooltip: MenuBarColumns.tooltip(readings))
-        }
+        battery.$visible
+            .combineLatest($airPodsSeparate)
+            .map { readings, separate in MenuBarColumns.columns(readings, airPods: separate ? .separate : .combined) }
+            .removeDuplicates()
+            .assign(to: &$batteryColumns)
+        battery.$visible
+            .map { MenuBarColumns.tooltip($0) }
+            .removeDuplicates()
+            .assign(to: &$batteryTooltip)
         battery.start()
     }
 
@@ -97,11 +104,6 @@ final class AppModel: ObservableObject {
         let pattern = UserDefaults.standard.string(forKey: "keyboard-name-pattern") ?? "G915|G913"
         return (try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]))
             ?? (try! NSRegularExpression(pattern: "G915|G913", options: [.caseInsensitive]))
-    }
-
-    /// Lets a click on the battery strip open the settings window (the SwiftUI `openWindow` action).
-    func setOpenSetupWindow(_ open: @escaping () -> Void) {
-        batteryItem.openSetup = open
     }
 
     deinit {

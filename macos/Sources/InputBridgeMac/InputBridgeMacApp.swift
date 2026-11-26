@@ -3,38 +3,32 @@ import AppKit
 
 @main
 struct InputBridgeMacApp: App {
-    @StateObject private var model = AppModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
+    // The menu bar item, its panel and the settings window are AppKit, owned by the app delegate: a SwiftUI
+    // menu bar label cannot draw the two-row, coloured battery columns. An app needs at least one scene.
     var body: some Scene {
-        MenuBarExtra {
-            MenuBarPanel(model: model, updates: model.updates)
-        } label: {
-            MenuBarLabel(model: model)
-        }
-        .menuBarExtraStyle(.window)
+        Settings { EmptyView() }
+    }
+}
 
-        Window("InputBridge", id: "setup") {
-            SetupView(model: model, updates: model.updates)
-                .frame(minWidth: 780, minHeight: 540)
-        }
-        .windowResizability(.contentMinSize)
+/// Creates the model, the settings window and the menu bar item once the app has launched, and keeps them alive.
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var model: AppModel?
+    private var settings: SetupWindowController?
+    private var statusBar: StatusBarController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let model = AppModel()
+        let settings = SetupWindowController(model: model)
+        self.model = model
+        self.settings = settings
+        statusBar = StatusBarController(model: model, settings: settings)
     }
 }
 
 // MARK: - Menu bar icon
-
-private struct MenuBarLabel: View {
-    @ObservedObject var model: AppModel
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        Image(nsImage: MenuBarImage.make(badged: model.updateAvailable))
-            .renderingMode(.original)
-            .accessibilityLabel(model.updateAvailable ? "InputBridge, update available" : "InputBridge")
-            // The label appears at launch, so the battery strip can open the settings window from then on.
-            .onAppear { model.setOpenSetupWindow { openWindow(id: "setup") } }
-    }
-}
 
 /// The colour app icon at menu bar size, optionally with an orange "!" badge in the lower-right corner.
 enum MenuBarImage {
@@ -67,10 +61,12 @@ enum MenuBarImage {
 
 // MARK: - Menu bar panel
 
-private struct MenuBarPanel: View {
+/// The panel the menu bar item opens.
+struct MenuBarPanel: View {
     @ObservedObject var model: AppModel
     @ObservedObject var updates: UpdateManager
-    @Environment(\.openWindow) private var openWindow
+    /// Closes the panel and shows the settings window.
+    let openSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -139,8 +135,7 @@ private struct MenuBarPanel: View {
 
             HStack(spacing: 14) {
                 Button {
-                    NSApp.activate(ignoringOtherApps: true)
-                    openWindow(id: "setup")
+                    openSettings()
                 } label: {
                     Label("Settings…", systemImage: "gearshape")
                 }
@@ -159,7 +154,6 @@ private struct MenuBarPanel: View {
             .padding(.vertical, 10)
         }
         .frame(width: 330)
-        .onAppear { model.setOpenSetupWindow { openWindow(id: "setup") } }
     }
 }
 
