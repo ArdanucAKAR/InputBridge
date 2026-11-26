@@ -7,9 +7,9 @@ public class BatteryIconVisualTests
 {
     private static readonly DateTimeOffset T0 = new(2026, 11, 19, 10, 0, 0, TimeSpan.Zero);
 
-    private static BatteryReading Reading(int percent, bool charging = false, bool remote = false, string name = "G915 TKL") =>
+    private static BatteryReading Reading(int percent, bool charging = false, string name = "G915 TKL") =>
         new("logitech-keyboard", name, DeviceKind.Keyboard,
-            [new BatteryComponent(ComponentRole.Main, percent, charging)], T0, remote);
+            [new BatteryComponent(ComponentRole.Main, percent, charging)], T0);
 
     [Theory]
     [InlineData(82, "82")]
@@ -32,20 +32,16 @@ public class BatteryIconVisualTests
         Assert.Equal(IconTone.Normal, BatteryIconVisual.Tone(Reading(16)));
 
     [Fact]
-    public void Tone_is_remote_for_a_remote_reading_even_when_low() =>
-        Assert.Equal(IconTone.Remote, BatteryIconVisual.Tone(Reading(10, remote: true)));
-
-    [Fact]
     public void Tooltip_shows_name_and_percentage() =>
         Assert.Equal("G915 TKL — 82%", BatteryIconVisual.Tooltip(Reading(82)));
 
     [Fact]
-    public void Tooltip_marks_charging() =>
-        Assert.Equal("G915 TKL — 82% (charging)", BatteryIconVisual.Tooltip(Reading(82, charging: true)));
+    public void Tooltip_ChargingNote() =>
+        Assert.EndsWith(" — 40% (charging)", BatteryIconVisual.Tooltip(Reading(40, charging: true)));
 
     [Fact]
-    public void Tooltip_marks_a_remote_reading() =>
-        Assert.Equal("G915 TKL — 82% (on Mac)", BatteryIconVisual.Tooltip(Reading(82, remote: true)));
+    public void Tooltip_marks_charging() =>
+        Assert.Equal("G915 TKL — 82% (charging)", BatteryIconVisual.Tooltip(Reading(82, charging: true)));
 
     [Fact]
     public void Tooltip_shortens_a_long_name_and_keeps_the_suffix_whole()
@@ -61,7 +57,7 @@ public class BatteryIconVisualTests
 
     [Fact]
     public void Tooltip_uses_the_short_display_name_of_the_keyboard() =>
-        Assert.Equal("G915 TKL — 82% (on Mac)", BatteryIconVisual.Tooltip(Reading(82, remote: true, name: G915HidppName)));
+        Assert.Equal("G915 TKL — 82%", BatteryIconVisual.Tooltip(Reading(82, name: G915HidppName)));
 
     [Theory]
     [InlineData(G915HidppName, "G915 TKL")]

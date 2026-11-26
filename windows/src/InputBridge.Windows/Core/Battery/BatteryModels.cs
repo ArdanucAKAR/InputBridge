@@ -11,8 +11,7 @@ public sealed record BatteryReading(
     string Name,
     DeviceKind Kind,
     IReadOnlyList<BatteryComponent> Components,
-    DateTimeOffset ReadAt,
-    bool Remote = false);
+    DateTimeOffset ReadAt);
 
 public static class BatteryIds
 {

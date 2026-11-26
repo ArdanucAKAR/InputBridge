@@ -274,7 +274,7 @@
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel>
               <TextBlock Text="Battery" Style="{StaticResource PageTitle}"/>
-              <TextBlock Style="{StaticResource PageSubtitle}" Text="Each wireless device with a battery reading gets its own icon in the taskbar notification area, showing its charge in percent. The keyboard reading is shared with the paired Mac."/>
+              <TextBlock Style="{StaticResource PageSubtitle}" Text="Each wireless device with a battery reading gets its own icon in the taskbar notification area, showing what it is and its charge in percent."/>
               <Border Style="{StaticResource Card}">
                 <StackPanel>
                   <CheckBox x:Name="BatteryIndicatorsEnabled" Style="{StaticResource ToggleSwitch}" Click="BatterySettings_Click"

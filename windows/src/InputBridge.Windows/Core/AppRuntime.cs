@@ -33,8 +33,7 @@ public sealed class AppRuntime
         Updates = new UpdateService(Settings);
         Battery = new BatteryService(
             [new LogitechBatterySource(KeyboardPattern)],
-            () => Settings.BatteryIndicatorsEnabled,
-            TimeProvider.System);
+            () => Settings.BatteryIndicatorsEnabled);
     }
 
     public async Task StartAsync()

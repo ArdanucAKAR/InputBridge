@@ -96,12 +96,3 @@ uint32 big-endian length | JPEG bytes | uint32 length | JPEG bytes | ...
 The camera is opened on demand: the first `stream` request starts capture of the configured Windows USB camera at 1080p, and capture stops 3 seconds after the last stream closes. Applying `mac` does not turn the camera on. Applying `windows` stops capture, ends open streams, and refuses new ones so local Windows apps can use the camera again.
 
 The InputBridge Camera extension on the Mac opens this stream itself, only while some app on the Mac is streaming from InputBridge Camera, and closes it when that app stops; it retries every 3 seconds if the stream drops while the camera is in use. The Mac companion gives the extension the controller URL and pairing token through a custom CoreMediaIO device property (`'ibcf'`, JSON `{"enabled","url","token"}`) while the Mac profile is applied, and disables it otherwise.
-
-## Battery sharing
-
-Battery readings use the JSON shape in `shared/fixtures/battery-readings.json`: `{ "readings": [ { "deviceId", "name", "kind", "components": [ { "role", "percent", "charging" } ], "readAt" } ] }` with camelCase keys, lowercase enum strings (`kind`: `keyboard|mouse|headset|trackpad|other`; `role`: `main|left|right|case`) and an ISO 8601 `readAt`.
-
-Both endpoints require `Authorization: Bearer <pairing-token>` and a private-network caller (otherwise `401` / `403`).
-
-- `GET /api/battery` returns the readings Windows has for the shared keyboard (`deviceId` `logitech-keyboard`), so the Mac can show it while the keyboard sits on the LIGHTSPEED receiver.
-- `POST /api/battery` pushes the keyboard reading the Mac read over Bluetooth, in the same shape. Windows keeps only `logitech-keyboard`, replaces its previous remote set (an empty list clears it), shows it only while no local reading exists for that id, and drops it after 11 minutes without a refresh. Response `{"ok":true}`; malformed JSON gives `400`; bodies over 16 KB give `413`.

@@ -5,7 +5,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Xunit;
-using Microsoft.Extensions.Time.Testing;
 
 namespace InputBridge.Windows.Tests;
 
@@ -26,146 +25,26 @@ public class BatteryServiceTests
     private static BatteryReading Reading(string id, string name, DeviceKind kind, int percent) =>
         new(id, name, kind, [new BatteryComponent(ComponentRole.Main, percent, false)], T0);
 
-    private static BatteryService Create(FakeSource source, FakeTimeProvider? clock = null, Func<bool>? enabled = null) =>
-        new([source], enabled ?? (() => true), clock ?? new FakeTimeProvider(T0));
+    private static BatteryService Create(FakeSource source, Func<bool>? enabled = null) =>
+        new([source], enabled ?? (() => true));
 
     private static BatteryReading SharedKeyboard(int percent) =>
         Reading(BatteryIds.SharedKeyboard, "G915 TKL", DeviceKind.Keyboard, percent);
 
     [Fact]
-    public void Remote_HiddenWhenLocalPresent()
+    public void Visible_IsEmptyWhenDisabled()
     {
-        var service = Create(new FakeSource(SharedKeyboard(70)));
-
-        service.SetRemote([SharedKeyboard(40)]);
-
-        var shown = Assert.Single(service.Visible);
-        Assert.Equal(70, shown.Components[0].Percent);
-        Assert.False(shown.Remote);
-    }
-
-    [Fact]
-    public void Remote_ShownWhenNoLocal_AndMarkedRemote()
-    {
-        var service = Create(new FakeSource());
-
-        service.SetRemote([SharedKeyboard(40)]);
-
-        var shown = Assert.Single(service.Visible);
-        Assert.Equal(40, shown.Components[0].Percent);
-        Assert.True(shown.Remote);
-    }
-
-    [Fact]
-    public void Remote_ExpiresAfter11Minutes()
-    {
-        var clock = new FakeTimeProvider(T0);
-        var service = Create(new FakeSource(), clock);
-        service.SetRemote([SharedKeyboard(40)]);
-
-        clock.Advance(TimeSpan.FromMinutes(10) + TimeSpan.FromSeconds(59));
-        Assert.Single(service.Visible);
-
-        clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Empty(service.Visible);
-    }
-
-    [Fact]
-    public void Remote_Expiry_RaisesChangedOnce()
-    {
-        var clock = new FakeTimeProvider(T0);
-        var service = Create(new FakeSource(), clock);
-        service.SetRemote([SharedKeyboard(40)]);
-        var count = 0;
-        service.Changed += () => count++;
-
-        clock.Advance(TimeSpan.FromMinutes(10) + TimeSpan.FromSeconds(59));
-        Assert.Equal(0, count);
-
-        clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(1, count);
-        Assert.Empty(service.Visible);
-
-        clock.Advance(TimeSpan.FromMinutes(30));
-        Assert.Equal(1, count);
-    }
-
-    [Fact]
-    public void Remote_NewerReadingPushesTheExpiry()
-    {
-        var clock = new FakeTimeProvider(T0);
-        var service = Create(new FakeSource(), clock);
-        service.SetRemote([SharedKeyboard(40)]);
-        var count = 0;
-        service.Changed += () => count++;
-
-        clock.Advance(TimeSpan.FromMinutes(6));
-        service.SetRemote([SharedKeyboard(38)]);
-        Assert.Equal(1, count);
-
-        clock.Advance(TimeSpan.FromMinutes(5));
-        Assert.Equal(1, count);
-        Assert.Single(service.Visible);
-
-        clock.Advance(TimeSpan.FromMinutes(6));
-        Assert.Equal(2, count);
-        Assert.Empty(service.Visible);
-    }
-
-    [Fact]
-    public void Remote_ClearingCancelsTheExpiry()
-    {
-        var clock = new FakeTimeProvider(T0);
-        var service = Create(new FakeSource(), clock);
-        service.SetRemote([SharedKeyboard(40)]);
-        service.SetRemote([]);
-        var count = 0;
-        service.Changed += () => count++;
-
-        clock.Advance(TimeSpan.FromMinutes(12));
-
-        Assert.Equal(0, count);
-    }
-
-    [Fact]
-    public void Remote_IgnoresNonSharedIds()
-    {
-        var service = Create(new FakeSource());
-
-        service.SetRemote([Reading("apple:AirPods", "AirPods", DeviceKind.Headset, 50)]);
+        var service = Create(new FakeSource(SharedKeyboard(40)), enabled: () => false);
 
         Assert.Empty(service.Visible);
     }
 
     [Fact]
-    public void Remote_KeepsOnlyLastReadingPerDeviceId()
+    public void Visible_ReturnsLocalReadingsWhenEnabled()
     {
-        var service = Create(new FakeSource());
+        var service = Create(new FakeSource(SharedKeyboard(40)));
 
-        service.SetRemote([SharedKeyboard(40), SharedKeyboard(30)]);
-
-        var shown = Assert.Single(service.Visible);
-        Assert.Equal(30, shown.Components[0].Percent);
-    }
-
-    [Fact]
-    public void Remote_EmptyListClearsPreviousRemote()
-    {
-        var service = Create(new FakeSource());
-        service.SetRemote([SharedKeyboard(40)]);
-
-        service.SetRemote([]);
-
-        Assert.Empty(service.Visible);
-    }
-
-    [Fact]
-    public void Disabled_ShowsNothing()
-    {
-        var service = Create(new FakeSource(SharedKeyboard(70)), enabled: () => false);
-        service.SetRemote([SharedKeyboard(40)]);
-
-        Assert.Empty(service.Visible);
+        Assert.Equal(40, Assert.Single(service.Visible).Components[0].Percent);
     }
 
     [Fact]
@@ -181,18 +60,7 @@ public class BatteryServiceTests
     }
 
     [Fact]
-    public void LocalShared_ReturnsOnlySharedLocalReadings()
-    {
-        var service = Create(new FakeSource(SharedKeyboard(70), Reading("m", "Mouse", DeviceKind.Mouse, 5)));
-        service.SetRemote([SharedKeyboard(40)]);
-
-        var shared = Assert.Single(service.LocalShared());
-        Assert.Equal(70, shared.Components[0].Percent);
-        Assert.False(shared.Remote);
-    }
-
-    [Fact]
-    public void Changed_FiresOnSourceChangeSetRemoteAndRefresh_AndSurvivesThrowingListener()
+    public void Changed_FiresOnSourceChangeAndRefresh_AndSurvivesThrowingListener()
     {
         var source = new FakeSource();
         var service = Create(source);
@@ -201,9 +69,8 @@ public class BatteryServiceTests
         service.Changed += () => count++;
 
         source.Raise();
-        service.SetRemote([]);
         service.Refresh();
 
-        Assert.Equal(3, count);
+        Assert.Equal(2, count);
     }
 }

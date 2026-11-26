@@ -4,7 +4,7 @@ using System.Text;
 
 namespace InputBridge.Windows;
 
-public enum IconTone { Normal, Low, Charging, Remote }
+public enum IconTone { Normal, Low, Charging }
 
 /// <summary>What a device's tray icon shows: its number, colour tone, tooltip and stable shell GUID.</summary>
 public static class BatteryIconVisual
@@ -23,7 +23,6 @@ public static class BatteryIconVisual
     public static IconTone Tone(BatteryReading reading)
     {
         var component = Primary(reading);
-        if (reading.Remote) return IconTone.Remote;
         if (component.Percent <= LowPercent && !component.Charging) return IconTone.Low;
         return component.Charging ? IconTone.Charging : IconTone.Normal;
     }
@@ -31,7 +30,7 @@ public static class BatteryIconVisual
     public static string Tooltip(BatteryReading reading)
     {
         var component = Primary(reading);
-        var note = reading.Remote ? " (on Mac)" : component.Charging ? " (charging)" : "";
+        var note = component.Charging ? " (charging)" : "";
         var suffix = $" — {Label(component.Percent)}%{note}";
         var name = DisplayName(reading.Name);
         var room = MaxTooltipLength - suffix.Length;

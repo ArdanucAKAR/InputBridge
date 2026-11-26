@@ -9,7 +9,6 @@ namespace InputBridge.Windows;
 public static class BatteryIconRenderer
 {
     private static readonly Color LowColor = Color.FromArgb(0xE8, 0x11, 0x23);
-    private const int RemoteAlpha = 115; // ~45 % opacity
 
     // Bahnschrift ships with Windows 10 and later; its digits stay readable at 16 px. "100" uses the condensed cut.
     private static readonly string[] RegularFonts = ["Bahnschrift SemiBold", "Segoe UI Semibold", "Segoe UI"];
@@ -43,7 +42,6 @@ public static class BatteryIconRenderer
         var color = tone switch
         {
             IconTone.Low => LowColor,
-            IconTone.Remote => Color.FromArgb(RemoteAlpha, plain),
             _ => plain
         };
 
