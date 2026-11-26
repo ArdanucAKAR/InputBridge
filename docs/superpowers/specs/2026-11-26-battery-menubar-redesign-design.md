@@ -1,6 +1,6 @@
 # Pil göstergeleri, ikinci tur: tek menü çubuğu öğesi, cihaz simgeli tepsi ikonları — tasarım
 
-Tarih: 2026-11-26 · Durum: onaylandı · Önceki tasarım: `2026-11-19-battery-indicators-design.md`
+Tarih: 2026-11-26 · Durum: onaylandı, uygulandı · Önceki tasarım: `2026-11-19-battery-indicators-design.md`
 
 ## Amaç ve neden
 

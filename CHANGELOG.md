@@ -2,12 +2,15 @@
 
 ## Unreleased
 
-- Windows shows the battery level of each wireless Logitech device (G915/G913 keyboard, LIGHTSPEED mice) as its own tray icon with the percentage drawn in it: red at 15 % or less, a bolt while charging, faded when the keyboard is connected to the Mac and the reading comes from there. An icon hides as soon as the receiver reports its device disconnected — when it is switched off or falls asleep — and comes back with a fresh reading when it wakes; InputBridge does not wake sleeping devices to read them. Left-clicking an icon opens the Battery page.
-- New Battery page on Windows with the "Show battery levels in the taskbar" switch and the list of devices with a reading.
+- Windows shows the battery level of each wireless Logitech device (G915/G913 keyboard, LIGHTSPEED mice, headsets) as its own tray icon: a keyboard, mouse or headset glyph (a battery outline for other devices) above the percentage, red at 15 % or less while not charging, a bolt while charging. An icon hides as soon as the receiver reports its device disconnected, and comes back with a fresh reading when it wakes; InputBridge does not wake sleeping devices to read them. Left-clicking an icon opens the Battery page.
+- New Battery page on Windows with the "Show battery levels in the taskbar" switch (on by default) and the list of devices with a reading.
 - Windows 11 puts new tray icons in the hidden icons menu; pin them once in *Settings → Personalization → Taskbar → Other system tray icons*. The icons keep their identity across restarts, so the pin is kept.
-- The Mac shows a battery strip in the menu bar, left of the InputBridge icon: the G915/G913 on Bluetooth, AirPods left, right and case separately, and Apple trackpads, mice and keyboards. Red at 15 % or less, a bolt while charging; disconnected devices disappear. Clicking it opens the settings window.
-- The paired Mac and PC share the G915/G913 battery reading (`GET`/`POST /api/battery`); the machine the keyboard is not connected to shows it faded.
-- New "Show battery levels" switch on the Mac (menu bar panel and *Devices*), on by default. Turning it off only hides the strip; the keyboard reading is still shared.
+- The Mac shows one menu bar item: the InputBridge icon, then one column per connected device with a small symbol on top and the percentage below. Devices: the G915/G913 on Bluetooth, AirPods and Apple trackpads, mice and keyboards. Red at 15 % or less while not charging, a bolt while charging. Clicking it opens the InputBridge panel.
+- AirPods show left, right and case separately by default. The new "Show AirPods left, right and case separately" switch in *Devices* combines them into one column with the lower earbud and hides the case.
+- New "Show battery levels" switch on the Mac (menu bar panel and *Devices*), on by default. Turning it off hides the columns and leaves only the icon.
+- Mac readings refresh every 5 minutes, on wake and when a Bluetooth device connects or disconnects. Reading the keyboard needs Input Monitoring, which the keyboard switch already uses; read failures go to the system log (subsystem `com.inputbridge.mac`, category `battery`).
+- A device disappears as soon as it disconnects. Each computer shows only the devices connected to it; the battery sharing between Mac and PC (`/api/battery`) is removed.
+- A G915 connected to the PC by USB cable is now read and shown once instead of up to six times.
 
 ## 0.2.8
 
