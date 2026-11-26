@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 final class SetupWindowController {
     private static let minimumSize = NSSize(width: 780, height: 540)
+    private static let frameName = "InputBridgeSettings"
 
     private let model: AppModel
     private var window: NSWindow?
@@ -35,7 +36,11 @@ final class SetupWindowController {
         // Setting the content view controller sizes the window to the view; start at the minimum instead.
         window.setContentSize(Self.minimumSize)
         window.isReleasedWhenClosed = false
-        window.center()
+        // Reopen where the user left it last time; the first time, centred at the minimum size.
+        if !window.setFrameUsingName(Self.frameName) {
+            window.center()
+        }
+        window.setFrameAutosaveName(Self.frameName)
         self.window = window
         return window
     }

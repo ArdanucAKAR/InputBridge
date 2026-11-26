@@ -11,10 +11,13 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let content = StatusItemView()
     private let popover = NSPopover()
-    /// When the popover last began closing. A click on the item closes a transient popover on mouse down, then
-    /// reaches the button's action on mouse up; that action must not reopen it.
-    private var lastClose: Date?
+    /// The click on the item that closed the transient popover, if one did. That click closes the popover on mouse
+    /// down, then reaches the button's action on mouse up; that one action must not reopen it.
+    private var closingClick: Int?
     private var cancellables = Set<AnyCancellable>()
+
+    /// Empty space left and right of the content, inside the item's highlight.
+    private static let horizontalInset: CGFloat = 3
 
     init(model: AppModel, settings: SetupWindowController) {
         self.model = model
@@ -27,8 +30,8 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             content.translatesAutoresizingMaskIntoConstraints = false
             button.addSubview(content)
             NSLayoutConstraint.activate([
-                content.leadingAnchor.constraint(equalTo: button.leadingAnchor),
-                content.trailingAnchor.constraint(equalTo: button.trailingAnchor),
+                content.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: Self.horizontalInset),
+                content.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -Self.horizontalInset),
                 content.topAnchor.constraint(equalTo: button.topAnchor),
                 content.bottomAnchor.constraint(equalTo: button.bottomAnchor),
             ])
@@ -53,7 +56,7 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     private func update(updateAvailable: Bool, columns: [MenuBarColumn], tooltip: String) {
         content.icon = MenuBarImage.make(badged: updateAvailable)
         content.columns = columns
-        item.length = content.intrinsicContentSize.width
+        item.length = content.intrinsicContentSize.width + 2 * Self.horizontalInset
 
         guard let button = item.button else { return }
         button.toolTip = tooltip.isEmpty ? nil : tooltip
@@ -65,31 +68,51 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
     // MARK: Panel
 
     @objc private func togglePanel(_ sender: Any?) {
+        let closedByThisClick = closingClick != nil && closingClick == Self.clickNumber(NSApp.currentEvent)
+        closingClick = nil
+        if closedByThisClick { return }
+
         if popover.isShown {
             popover.performClose(sender)
+            closingClick = nil // closed by this action, not before it
             return
-        }
-        if let lastClose, Date().timeIntervalSince(lastClose) < 0.3 {
-            return // this click already closed the popover
         }
         guard let button = item.button else { return }
         // An accessory app must be active for the transient popover to close on a click elsewhere.
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        button.highlight(true)
+        // After the button's own mouse tracking, which would otherwise clear the highlight again.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.popover.isShown else { return }
+            self.item.button?.highlight(true)
+        }
     }
 
     private func openSettings() {
         popover.performClose(nil)
-        NSApp.activate(ignoringOtherApps: true)
-        settings.show()
+        settings.show() // activates the app
     }
 
     func popoverWillClose(_ notification: Notification) {
-        lastClose = Date()
+        // A click on the item itself, as opposed to one elsewhere, Escape or Settings….
+        let event = NSApp.currentEvent
+        guard let event, let button = item.button, event.window === button.window else { return }
+        closingClick = Self.clickNumber(event)
     }
 
     func popoverDidClose(_ notification: Notification) {
         item.button?.highlight(false)
+    }
+
+    /// Identifies a click: a mouse-up carries the event number of its mouse-down. Nil for anything but a click,
+    /// where `eventNumber` is not available.
+    private static func clickNumber(_ event: NSEvent?) -> Int? {
+        guard let event else { return nil }
+        switch event.type {
+        case .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp:
+            return event.eventNumber
+        default:
+            return nil
+        }
     }
 }

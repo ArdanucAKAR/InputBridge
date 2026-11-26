@@ -9,6 +9,13 @@ struct InputBridgeMacApp: App {
     // menu bar label cannot draw the two-row, coloured battery columns. An app needs at least one scene.
     var body: some Scene {
         Settings { EmptyView() }
+            .commands {
+                // ⌘, still fires while the panel or the settings window is active; open the real settings window.
+                CommandGroup(replacing: .appSettings) {
+                    Button("Settings…") { appDelegate.showSettings() }
+                        .keyboardShortcut(",")
+                }
+            }
     }
 }
 
@@ -25,6 +32,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.model = model
         self.settings = settings
         statusBar = StatusBarController(model: model, settings: settings)
+    }
+
+    /// Opening InputBridge again from Finder or Spotlight while it runs shows the settings window.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return false
+    }
+
+    func showSettings() {
+        settings?.show()
     }
 }
 
