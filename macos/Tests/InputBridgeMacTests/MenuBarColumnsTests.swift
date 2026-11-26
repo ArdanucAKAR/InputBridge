@@ -58,6 +58,49 @@ final class MenuBarColumnsTests: XCTestCase {
         XCTAssertEqual(MenuBarColumns.columns([airPods], airPods: .combined).map(\.tone), [.low])
     }
 
+    func testAirPodsCombinedCaseOnlyShowsNothing() {
+        let airPods = reading("apple:AirPods", "AirPods", .headset, [part(.`case`, 70)])
+        XCTAssertEqual(MenuBarColumns.columns([airPods], airPods: .combined), [])
+    }
+
+    func testAirPodsCombinedChargingLowerEarbudIsCharging() {
+        let airPods = reading("apple:AirPods", "AirPods", .headset, [
+            part(.left, 90), part(.right, 50, charging: true),
+        ])
+        XCTAssertEqual(MenuBarColumns.columns([airPods], airPods: .combined).map(\.tone), [.charging])
+    }
+
+    func testAirPodsCombinedTiePrefersChargingEarbud() {
+        let airPods = reading("apple:AirPods", "AirPods", .headset, [
+            part(.left, 60), part(.right, 60, charging: true),
+        ])
+        XCTAssertEqual(
+            MenuBarColumns.columns([airPods], airPods: .combined),
+            [MenuBarColumn(symbol: "airpods", text: "60%", tone: .charging)])
+    }
+
+    func testAirPodsSeparateWithSingleEarbudShowsEarbudAndCase() {
+        let airPods = reading("apple:AirPods", "AirPods", .headset, [part(.right, 40), part(.`case`, 70)])
+        XCTAssertEqual(MenuBarColumns.columns([airPods], airPods: .separate), [
+            MenuBarColumn(symbol: "airpod.right", text: "40%", tone: .normal),
+            MenuBarColumn(symbol: MenuBarColumns.caseSymbol, text: "70%", tone: .normal),
+        ])
+    }
+
+    func testNoReadingsOrNoComponentsShowNothing() {
+        XCTAssertEqual(MenuBarColumns.columns([], airPods: .separate), [])
+        let empty = reading("a", "Empty", .other, [])
+        XCTAssertEqual(MenuBarColumns.columns([empty], airPods: .separate), [])
+        XCTAssertEqual(MenuBarColumns.columns([empty], airPods: .combined), [])
+    }
+
+    func testHeadsetWithOnlyMainComponent() {
+        let headset = reading("bt:Headset", "Headset", .headset, [level(55)])
+        let expected = [MenuBarColumn(symbol: "airpods", text: "55%", tone: .normal)]
+        XCTAssertEqual(MenuBarColumns.columns([headset], airPods: .separate), expected)
+        XCTAssertEqual(MenuBarColumns.columns([headset], airPods: .combined), expected)
+    }
+
     func testFifteenPercentNotChargingIsLow() {
         XCTAssertEqual(MenuBarColumns.tone(level(15)), .low)
     }

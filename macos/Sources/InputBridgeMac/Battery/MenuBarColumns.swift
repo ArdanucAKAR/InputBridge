@@ -66,8 +66,14 @@ enum MenuBarColumns {
     private static func columns(of reading: BatteryReading, airPods: AirPodsLayout) -> [MenuBarColumn] {
         let components = reading.components.sorted(by: { order($0.role) < order($1.role) })
         let earbuds = components.filter { $0.role == .left || $0.role == .right }
-        if airPods == .combined, let lower = earbuds.min(by: { $0.percent < $1.percent }) {
-            return [column(symbol(for: reading.kind), lower)]
+        if airPods == .combined {
+            // The lower earbud; on a tie the charging one, so the charging tone is not lost.
+            let lower = earbuds.min { a, b in
+                a.percent != b.percent ? a.percent < b.percent : (a.charging && !b.charging)
+            }
+            if let lower { return [column(symbol(for: reading.kind), lower)] }
+            // No earbud reading: the case is hidden in combined mode, anything else is kept.
+            return components.filter { $0.role == .main }.map { column(symbol(for: reading.kind), $0) }
         }
         return components.map { component in
             switch component.role {
