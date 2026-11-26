@@ -69,7 +69,8 @@ enum LogitechBluetoothKeyboard {
     /// Reads the battery of the matching keyboard while it is connected to this Mac over Bluetooth; nil when it is not
     /// connected here or exposes no battery feature. Never shows a permission prompt: throws
     /// `inputMonitoringRequired` when Input Monitoring is not granted.
-    /// Every step goes to `BatteryLog`: the info lines and above tell the story, the feature index is debug.
+    /// Every step goes to `BatteryLog`. Outcomes (match or no match, percent, no battery feature) are notice and
+    /// failures are error, so a plain `log show` tells the story; reply bytes are info and the feature index debug.
     static func batteryReading(namePattern: NSRegularExpression) throws -> BatteryReading? {
         let log = BatteryLog.logger
         let pattern = namePattern.pattern
@@ -84,25 +85,24 @@ enum LogitechBluetoothKeyboard {
 
         let noMatch: ([String]) -> Void = { seen in
             let names = seen.isEmpty ? "none" : seen.map { "\"\($0)\"" }.joined(separator: ", ")
-            log.info("No HID++ collection matches \(pattern, privacy: .public); collections seen: \(names, privacy: .public)")
+            log.notice("No HID++ collection matches \(pattern, privacy: .public); collections seen: \(names, privacy: .public)")
         }
         return try withMatchingKeyboard(namePattern: namePattern, noMatch: noMatch) { (device, name) -> BatteryReading? in
-            log.info("Matched HID++ collection \"\(name, privacy: .public)\"")
-            let session = try HIDPPSession(device: device, softwareID: batterySoftwareID, requestAccessIfDenied: false)
+            log.notice("Matched HID++ collection \"\(name, privacy: .public)\"")
+            let session = try step("Opening \"\(name)\"") {
+                try HIDPPSession(device: device, softwareID: batterySoftwareID, requestAccessIfDenied: false)
+            }
             defer { session.close() }
 
-            // One HID++ request, logging its reply bytes, or its error before passing it on.
-            func ask(_ step: String, feature: UInt8, function: UInt8, parameters: [UInt8] = []) throws -> [UInt8] {
-                do {
-                    let reply = try session.request(feature: feature, function: function, parameters: parameters)
-                    let bytes = hex(reply)
-                    log.info("\(step, privacy: .public) replied \(bytes, privacy: .public)")
-                    return reply
-                } catch {
-                    let description = describe(error)
-                    log.info("\(step, privacy: .public) failed: \(description, privacy: .public)")
-                    throw error
+            // One HID++ request. Logs its reply bytes; a failure carries the step name to the one error line that
+            // LogitechBluetoothBatterySource.read() writes.
+            func ask(_ label: String, feature: UInt8, function: UInt8, parameters: [UInt8] = []) throws -> [UInt8] {
+                let reply = try step(label) {
+                    try session.request(feature: feature, function: function, parameters: parameters)
                 }
+                let bytes = hex(reply)
+                log.info("\(label, privacy: .public) replied \(bytes, privacy: .public)")
+                return reply
             }
 
             for feature in batteryFeatures {
@@ -120,8 +120,15 @@ enum LogitechBluetoothKeyboard {
                 let parsed: BatteryComponent?
                 if feature == HIDPPBattery.featureUnifiedBattery {
                     // get_capabilities (fn 0), then get_status (fn 1).
-                    let capabilities = try? ask("Feature \(id) get_capabilities", feature: index, function: 0)
-                    let stateOfCharge = capabilities.map(HIDPPBattery.parseUnifiedCapabilities) ?? false
+                    var stateOfCharge = false
+                    do {
+                        let capabilities = try ask("Feature \(id) get_capabilities", feature: index, function: 0)
+                        stateOfCharge = HIDPPBattery.parseUnifiedCapabilities(capabilities)
+                    } catch {
+                        // Not fatal: the status still gives a level from its flags.
+                        let description = describe(error)
+                        log.info("\(description, privacy: .public); reading the status without capabilities")
+                    }
                     reply = try ask("Feature \(id) get_status", feature: index, function: 1)
                     parsed = HIDPPBattery.parseUnifiedStatus(reply, stateOfChargeSupported: stateOfCharge)
                 } else if feature == HIDPPBattery.featureBatteryStatus {
@@ -137,12 +144,12 @@ enum LogitechBluetoothKeyboard {
                     return nil
                 }
                 let charging = component.charging ? "charging" : "not charging"
-                log.info("\(name, privacy: .public) battery \(component.percent, privacy: .public)%, \(charging, privacy: .public)")
+                log.notice("\(name, privacy: .public) battery \(component.percent, privacy: .public)%, \(charging, privacy: .public)")
                 return BatteryReading(
                     deviceId: BatteryIds.sharedKeyboard, name: name, kind: .keyboard,
                     components: [component], readAt: Date())
             }
-            log.info("\(name, privacy: .public) supports none of the battery features")
+            log.notice("\(name, privacy: .public) supports none of the battery features")
             return nil
         }
     }
@@ -152,9 +159,28 @@ enum LogitechBluetoothKeyboard {
         bytes.map { String(format: "%02X", $0) }.joined(separator: " ")
     }
 
-    /// The readable description followed by the case, e.g. `the keyboard did not answer. [noReply]`.
+    /// A battery read step that failed, e.g. `Feature lookup 0x1004`, with the error it threw.
+    struct StepFailed: Error {
+        let step: String
+        let underlying: Error
+    }
+
+    /// Runs `body`, wrapping what it throws in `StepFailed` so the one logged error names the step.
+    private static func step<T>(_ step: String, _ body: () throws -> T) throws -> T {
+        do {
+            return try body()
+        } catch {
+            throw StepFailed(step: step, underlying: error)
+        }
+    }
+
+    /// The readable description followed by the case, e.g. `the keyboard did not answer. [noReply]`; a failed step
+    /// is prefixed with its name: `Feature lookup 0x1004 failed: the keyboard did not answer. [noReply]`.
     static func describe(_ error: Error) -> String {
-        "\(error.localizedDescription) [\(String(describing: error))]"
+        if let failed = error as? StepFailed {
+            return "\(failed.step) failed: \(describe(failed.underlying))"
+        }
+        return "\(error.localizedDescription) [\(String(describing: error))]"
     }
 
     /// Runs `body` with the first connected HID++ collection whose product name matches; nil when there is none.
@@ -207,8 +233,11 @@ struct LogitechBluetoothBatterySource: BatterySource {
     func read() -> [BatteryReading] {
         do {
             return try LogitechBluetoothKeyboard.batteryReading(namePattern: pattern()).map { [$0] } ?? []
+        } catch LogitechBluetoothKeyboard.KeyboardError.inputMonitoringRequired {
+            // Already logged where the access check failed.
+            return []
         } catch {
-            // inputMonitoringRequired, or the keyboard did not answer: no reading this time.
+            // A failed step (the keyboard did not answer, …): no reading this time. The only error line for it.
             let description = LogitechBluetoothKeyboard.describe(error)
             BatteryLog.logger.error("Keyboard battery read failed: \(description, privacy: .public)")
             return []

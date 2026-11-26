@@ -8,8 +8,10 @@ protocol BatterySource: Sendable {
     func read() -> [BatteryReading]
 }
 
-/// The battery reader's log. On the Mac:
-/// `log show --info --last 1h --predicate 'subsystem == "com.inputbridge.mac" AND category == "battery"'`.
+/// The battery reader's log. Outcomes are notice or error, which macOS stores by default, so this shows them:
+/// `log show --last 30m --predicate 'subsystem == "com.inputbridge.mac" AND category == "battery"'`.
+/// The per-request reply bytes are info and the feature index is debug: watch them live with
+/// `log stream --level debug --predicate '…'`.
 enum BatteryLog {
     static let logger = Logger(subsystem: "com.inputbridge.mac", category: "battery")
 }
