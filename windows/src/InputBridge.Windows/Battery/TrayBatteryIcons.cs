@@ -102,7 +102,7 @@ public sealed class TrayBatteryIcons : IDisposable
     private void Show(Entry entry, BatteryReading reading, bool dark, int size)
     {
         var tip = BatteryIconVisual.Tooltip(reading);
-        var key = $"{BatteryIconVisual.Label(BatteryIconVisual.Primary(reading).Percent)}|{BatteryIconVisual.Tone(reading)}|{dark}|{size}|{tip}";
+        var key = $"{BatteryIconVisual.Label(BatteryIconVisual.Primary(reading).Percent)}|{BatteryIconVisual.Tone(reading)}|{reading.Kind}|{dark}|{size}|{tip}";
         if (entry.Added && !entry.Hidden && entry.Key == key) return;
 
         var icon = entry.Key == key && entry.Icon is not null ? entry.Icon : BatteryIconRenderer.Render(reading, dark, size);
