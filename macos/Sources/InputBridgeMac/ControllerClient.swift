@@ -119,44 +119,6 @@ final class ControllerClient {
         return claim.target.flatMap { ProfileMode(rawValue: $0) }
     }
 
-    /// The shared keyboard reading the Windows controller has (empty when it has none, or is older than battery support).
-    func fetchBattery(offer: ControllerOffer) async throws -> [BatteryReading] {
-        guard let token = keychain.read(tokenAccount) else { throw ClientError.notPaired }
-        var request = URLRequest(url: offer.baseURL.appendingPathComponent("api/battery"))
-        request.timeoutInterval = 5
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode == 404 { return [] } // older controller
-        try assertHTTP(response)
-        return try JSONDecoder().decode(BatteryEnvelope.self, from: data).readings
-    }
-
-    /// Sends this Mac's shared keyboard reading; an empty list tells Windows the keyboard is not on this Mac.
-    func postBattery(_ readings: [BatteryReading], offer: ControllerOffer, timeout: TimeInterval = 5) async throws {
-        guard let token = keychain.read(tokenAccount) else { throw ClientError.notPaired }
-        var request = URLRequest(url: offer.baseURL.appendingPathComponent("api/battery"))
-        request.httpMethod = "POST"
-        request.timeoutInterval = timeout
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(BatteryEnvelope(readings: Self.acceptedByController(readings)))
-        let (_, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, http.statusCode == 404 { return } // older controller
-        try assertHTTP(response)
-    }
-
-    /// The Windows controller rejects the whole post when one reading breaks its limits (BatteryWire.cs), so leave
-    /// such readings out: at most 8, id and name 1–128 UTF-16 units, 1–3 components, percent 0–100.
-    private static func acceptedByController(_ readings: [BatteryReading]) -> [BatteryReading] {
-        let valid = readings.filter { reading in
-            (1...128).contains(reading.deviceId.utf16.count)
-                && (1...128).contains(reading.name.utf16.count)
-                && (1...3).contains(reading.components.count)
-                && reading.components.allSatisfy { (0...100).contains($0.percent) }
-        }
-        return Array(valid.prefix(8))
-    }
-
     private func save(_ controller: StoredController) {
         guard let data = try? JSONEncoder().encode(controller) else { return }
         defaults.set(data, forKey: controllerKey)

@@ -2,7 +2,7 @@ import Foundation
 
 /// One piece of the menu bar battery strip: an SF Symbol name (empty for none) followed by a short text.
 struct StripSegment: Equatable {
-    enum Tone { case normal, low, charging, remote }
+    enum Tone { case normal, low, charging }
 
     let symbol: String
     let text: String
@@ -35,9 +35,8 @@ enum BatteryStrip {
         }
     }
 
-    /// Same precedence as the Windows tray icons: remote, then low (not charging), then charging.
-    static func tone(_ component: BatteryComponent, remote: Bool) -> StripSegment.Tone {
-        if remote { return .remote }
+    /// Same precedence as the Windows tray icons: low (not charging), then charging.
+    static func tone(_ component: BatteryComponent) -> StripSegment.Tone {
         if component.percent <= lowPercent && !component.charging { return .low }
         return component.charging ? .charging : .normal
     }
@@ -48,7 +47,7 @@ enum BatteryStrip {
         var result: [StripSegment] = []
         for component in reading.components.sorted(by: { order($0.role) < order($1.role) }) {
             let percent = min(max(component.percent, 0), 100)
-            let shade = Self.tone(component, remote: reading.remote)
+            let shade = Self.tone(component)
             switch component.role {
             case .main:
                 result.append(StripSegment(symbol: deviceSymbol, text: "\(percent)%", tone: shade))

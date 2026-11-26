@@ -17,7 +17,7 @@ final class AppModel: ObservableObject {
     @Published var keyboardSwitchEnabled = UserDefaults.standard.object(forKey: "keyboard-switch-enabled") as? Bool ?? true
     @Published var manualHost = UserDefaults.standard.string(forKey: "manual-controller-host") ?? ""
     @Published var manualPort = UserDefaults.standard.string(forKey: "manual-controller-port") ?? "41715"
-    /// "Show battery levels": only hides the menu bar strip; the keyboard reading is still shared with Windows.
+    /// "Show battery levels": shows the menu bar strip. While it is off, no battery is read.
     @Published var batteryIndicatorsEnabled = UserDefaults.standard.object(forKey: "battery-indicators-enabled") as? Bool ?? true {
         didSet {
             UserDefaults.standard.set(batteryIndicatorsEnabled, forKey: "battery-indicators-enabled")
@@ -45,10 +45,10 @@ final class AppModel: ObservableObject {
     private var lastApplied: (mode: ProfileMode, at: Date)?
     private var keyboardPoll: Task<Void, Never>?
     private lazy var battery: BatteryMonitor = BatteryMonitor(
-        keyboard: LogitechBluetoothBatterySource(pattern: { AppModel.savedKeyboardPattern() }),
-        others: [AppleBatterySource(excluding: { AppModel.savedKeyboardPattern() })],
-        controller: controller,
-        offer: { [weak self] in self?.selectedOffer },
+        sources: [
+            LogitechBluetoothBatterySource(pattern: { AppModel.savedKeyboardPattern() }),
+            AppleBatterySource(excluding: { AppModel.savedKeyboardPattern() }),
+        ],
         enabled: batteryIndicatorsEnabled)
     private let batteryItem = BatteryStatusItem()
     private var batteryStrip: AnyCancellable?

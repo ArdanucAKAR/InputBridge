@@ -2,7 +2,7 @@ import Foundation
 import IOKit
 
 /// Apple Bluetooth peripherals: trackpad, mouse and keyboard from the IORegistry, AirPods-style earbuds from
-/// `system_profiler`. Devices matching `excluding` (the shared keyboard pattern) are left out, because the
+/// `system_profiler`. Devices matching `excluding` (the keyboard name pattern) are left out, because the
 /// Logitech source reports that keyboard.
 struct AppleBatterySource: BatterySource {
     private static let profilerTimeout: TimeInterval = 10

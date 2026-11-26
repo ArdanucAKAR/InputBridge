@@ -1,9 +1,6 @@
 import Foundation
 import XCTest
 
-// 2026-11-19T10:00:00Z
-private let fixtureReadAt = Date(timeIntervalSince1970: 1_795_082_400)
-
 private let airPodsProfile = """
 Bluetooth:
 
@@ -125,59 +122,6 @@ final class BatteryParsingTests: XCTestCase {
         }
     }
 
-    // MARK: Wire format (shared/fixtures/battery-readings.json)
-
-    func testFixtureDecodes() throws {
-        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "battery-readings", withExtension: "json"))
-        let envelope = try JSONDecoder().decode(BatteryEnvelope.self, from: Data(contentsOf: url))
-
-        XCTAssertEqual(envelope.readings.count, 1)
-        let reading = try XCTUnwrap(envelope.readings.first)
-        XCTAssertEqual(reading.deviceId, BatteryIds.sharedKeyboard)
-        XCTAssertEqual(reading.name, "G915 TKL")
-        XCTAssertEqual(reading.kind, .keyboard)
-        XCTAssertEqual(reading.components, [BatteryComponent(role: .main, percent: 82, charging: false)])
-        XCTAssertEqual(reading.readAt, fixtureReadAt)
-        XCTAssertFalse(reading.remote)
-
-        let again = try JSONDecoder().decode(BatteryEnvelope.self, from: JSONEncoder().encode(envelope))
-        XCTAssertEqual(again.readings, envelope.readings)
-    }
-
-    func testEncodesWireFormat() throws {
-        let reading = BatteryReading(
-            deviceId: "apple:AirPods", name: "AirPods", kind: .headset,
-            components: [BatteryComponent(role: .`case`, percent: 60, charging: true)],
-            readAt: fixtureReadAt, remote: true)
-
-        let data = try JSONEncoder().encode(BatteryEnvelope(readings: [reading]))
-        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        let readings = try XCTUnwrap(root["readings"] as? [[String: Any]])
-        let item = try XCTUnwrap(readings.first)
-
-        XCTAssertEqual(Set(item.keys), ["deviceId", "name", "kind", "components", "readAt"])
-        XCTAssertEqual(item["kind"] as? String, "headset")
-        XCTAssertEqual(item["readAt"] as? String, "2026-11-19T10:00:00Z")
-        let component = try XCTUnwrap((item["components"] as? [[String: Any]])?.first)
-        XCTAssertEqual(component["role"] as? String, "case")
-        XCTAssertEqual(component["percent"] as? Int, 60)
-        XCTAssertEqual(component["charging"] as? Bool, true)
-    }
-
-    func testDecodesWindowsDateForms() throws {
-        // System.Text.Json writes DateTimeOffset as "+00:00" with up to 7 fractional digits.
-        XCTAssertEqual(try decodeReadAt("2026-11-19T10:00:00+00:00"), fixtureReadAt)
-        XCTAssertEqual(try decodeReadAt("2026-11-19T13:00:00+03:00"), fixtureReadAt)
-        XCTAssertEqual(try decodeReadAt("2026-11-19T07:30:00-02:30"), fixtureReadAt)
-        let fractional = try decodeReadAt("2026-11-19T10:00:00.1234567+00:00")
-        XCTAssertEqual(fractional.timeIntervalSince1970, fixtureReadAt.timeIntervalSince1970 + 0.1234567, accuracy: 0.000_001)
-    }
-
-    func testRejectsInvalidDate() {
-        XCTAssertThrowsError(try decodeReadAt("2026-11-19 10:00:00"))
-        XCTAssertThrowsError(try decodeReadAt("2026-13-19T10:00:00Z"))
-    }
-
     // MARK: system_profiler SPBluetoothDataType
 
     func testProfilerReadsAirPods() {
@@ -206,7 +150,6 @@ final class BatteryParsingTests: XCTestCase {
         XCTAssertEqual(reading.deviceId, "apple:Magic Trackpad")
         XCTAssertEqual(reading.name, "Magic Trackpad")
         XCTAssertEqual(reading.components, [BatteryComponent(role: .main, percent: 64, charging: false)])
-        XCTAssertFalse(reading.remote)
 
         XCTAssertNil(AppleHIDParser.reading(product: "Magic Trackpad", batteryPercent: nil, charging: false))
     }
@@ -215,14 +158,5 @@ final class BatteryParsingTests: XCTestCase {
         XCTAssertEqual(AppleHIDParser.reading(product: "Magic Mouse", batteryPercent: 50, charging: false)?.kind, .mouse)
         XCTAssertEqual(AppleHIDParser.reading(product: "Magic Keyboard with Touch ID", batteryPercent: 50, charging: true)?.kind, .keyboard)
         XCTAssertEqual(AppleHIDParser.reading(product: "Pencil", batteryPercent: 50, charging: false)?.kind, .other)
-    }
-
-    private func decodeReadAt(_ text: String) throws -> Date {
-        let json = """
-        {"readings":[{"deviceId":"logitech-keyboard","name":"G915 TKL","kind":"keyboard",\
-        "components":[{"role":"main","percent":82,"charging":false}],"readAt":"\(text)"}]}
-        """
-        let envelope = try JSONDecoder().decode(BatteryEnvelope.self, from: Data(json.utf8))
-        return try XCTUnwrap(envelope.readings.first).readAt
     }
 }

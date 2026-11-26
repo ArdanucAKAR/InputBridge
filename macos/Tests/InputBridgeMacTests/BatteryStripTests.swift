@@ -2,11 +2,11 @@ import Foundation
 import XCTest
 
 private func reading(
-    _ deviceId: String, _ name: String, _ kind: DeviceKind, _ components: [BatteryComponent], remote: Bool = false
+    _ deviceId: String, _ name: String, _ kind: DeviceKind, _ components: [BatteryComponent]
 ) -> BatteryReading {
     BatteryReading(
         deviceId: deviceId, name: name, kind: kind, components: components,
-        readAt: Date(timeIntervalSince1970: 1_795_082_400), remote: remote)
+        readAt: Date(timeIntervalSince1970: 1_795_082_400))
 }
 
 private func level(_ percent: Int, charging: Bool = false) -> BatteryComponent {
@@ -51,11 +51,6 @@ final class BatteryStripTests: XCTestCase {
     func testFifteenPercentChargingIsCharging() {
         let mouse = reading("apple:Magic Mouse", "Magic Mouse", .mouse, [level(15, charging: true)])
         XCTAssertEqual(BatteryStrip.segments([mouse]).map(\.tone), [.charging])
-    }
-
-    func testRemoteWinsOverLow() {
-        let g915 = reading("logitech-keyboard", "G915 TKL", .keyboard, [level(10)], remote: true)
-        XCTAssertEqual(BatteryStrip.segments([g915]).map(\.tone), [.remote])
     }
 
     func testNoReadingsNoSegments() {

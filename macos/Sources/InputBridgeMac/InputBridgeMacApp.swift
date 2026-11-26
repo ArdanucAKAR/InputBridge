@@ -469,7 +469,7 @@ private struct DevicesPane: View {
             } header: {
                 Text("Battery")
             } footer: {
-                Text("Shows the G915/G913, AirPods (left, right, case) and Apple trackpads, mice and keyboards in the menu bar; a keyboard reading from Windows is drawn faded. Applies right away. The keyboard reading is shared with Windows either way.")
+                Text("Shows the G915/G913 on Bluetooth, AirPods and Apple trackpads, mice and keyboards connected to this Mac. A device disappears as soon as it disconnects.")
             }
 
             Section {

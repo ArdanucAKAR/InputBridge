@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Something on this Mac that can report device batteries.
 protocol BatterySource: Sendable {
@@ -7,23 +8,8 @@ protocol BatterySource: Sendable {
     func read() -> [BatteryReading]
 }
 
-/// The shared Logitech keyboard (G915/G913) while it is connected to this Mac over Bluetooth, read over HID++.
-/// Silently empty when Input Monitoring is not granted: it never shows a permission prompt.
-struct LogitechBluetoothBatterySource: BatterySource {
-    private let pattern: @Sendable () -> NSRegularExpression
-
-    init(pattern: @escaping @Sendable () -> NSRegularExpression) {
-        self.pattern = pattern
-    }
-
-    var name: String { "Logitech Bluetooth keyboard" }
-
-    func read() -> [BatteryReading] {
-        do {
-            return try LogitechBluetoothKeyboard.batteryReading(namePattern: pattern()).map { [$0] } ?? []
-        } catch {
-            // inputMonitoringRequired, or the keyboard did not answer: no reading this time.
-            return []
-        }
-    }
+/// The battery reader's log. On the Mac:
+/// `log show --info --last 1h --predicate 'subsystem == "com.inputbridge.mac" AND category == "battery"'`.
+enum BatteryLog {
+    static let logger = Logger(subsystem: "com.inputbridge.mac", category: "battery")
 }

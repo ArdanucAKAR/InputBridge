@@ -66,7 +66,6 @@ final class BatteryStatusItem: NSObject {
         switch tone {
         case .normal, .charging: return .labelColor
         case .low: return .systemRed
-        case .remote: return .secondaryLabelColor
         }
     }
 
@@ -88,7 +87,7 @@ final class BatteryStatusItem: NSObject {
         return NSAttributedString(attachment: attachment)
     }
 
-    /// One line per device, e.g. `AirPods Pro: L 90%, R 85%, case 60%` or `G915 TKL: 82% (on Windows)`.
+    /// One line per device, e.g. `AirPods Pro: L 90%, R 85%, case 60%` or `G915 TKL: 82%`.
     private static func tooltip(_ readings: [BatteryReading]) -> String {
         readings.map { reading in
             let levels = reading.components.map { component -> String in
@@ -100,7 +99,7 @@ final class BatteryStatusItem: NSObject {
                 case .`case`: return "case " + level
                 }
             }
-            return "\(reading.name): " + levels.joined(separator: ", ") + (reading.remote ? " (on Windows)" : "")
+            return "\(reading.name): " + levels.joined(separator: ", ")
         }.joined(separator: "\n")
     }
 }
