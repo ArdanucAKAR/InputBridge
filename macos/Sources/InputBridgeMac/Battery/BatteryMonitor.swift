@@ -3,7 +3,7 @@ import Combine
 import IOBluetooth
 
 /// Reads the batteries of the devices connected to this Mac every 5 minutes and on wake, Bluetooth
-/// connect/disconnect and `refresh()`, and publishes what the menu bar strip shows. Nothing is shared with the
+/// connect/disconnect and `refresh()`, and publishes what the battery columns of the InputBridge menu bar item show. Nothing is shared with the
 /// Windows controller: each machine shows only its own connected devices, and a device that disconnects
 /// disappears with the next read.
 ///

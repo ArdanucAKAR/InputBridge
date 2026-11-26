@@ -5,8 +5,8 @@ namespace InputBridge.Windows;
 
 /// <summary>
 /// Batteries of Logitech devices on LIGHTSPEED/Unifying receivers, driven by HID++ notifications so sleeping devices
-/// are never woken: one startup slot scan per receiver and app session, then reads only when a device links, on the
-/// device's own battery events, and at most every 30 minutes for devices known to be online. Every open (including a
+/// are never woken: one startup slot scan per receiver and app session (a direct, cabled device is scanned on every open),
+/// then reads only when a device links, on the device's own battery events, and at most every 30 minutes for devices known to be online. Every open (including a
 /// reopen after resume) asks the receiver itself which paired devices are linked, which wakes nothing.
 /// </summary>
 public sealed class LogitechBatterySource : IBatterySource
@@ -185,6 +185,7 @@ public sealed class LogitechBatterySource : IBatterySource
     /// <param name="receiver">The receiver just opened.</param>
     /// <param name="scan">
     /// Run the slot ping scan: only on the first open of this receiver in the app session, as it wakes sleeping devices.
+    /// A direct (cabled) device is scanned on every open regardless (see <c>HidppCollectionPlan.ShouldScan</c>).
     /// </param>
     /// <param name="token">Stops the source.</param>
     private async Task InitialiseAsync(Receiver receiver, bool scan, CancellationToken token)
@@ -202,8 +203,8 @@ public sealed class LogitechBatterySource : IBatterySource
             if (!isReceiver) Log($"{receiver.Key}: direct device");
             if (!HidppCollectionPlan.ShouldScan(isReceiver, scan)) return;
 
-            // The one allowed startup scan, kept as a fallback for receivers that do not answer the register query:
-            // it wakes sleeping devices, so it runs once per receiver per app session.
+            // Startup slot scan, once per receiver per app session (it wakes sleeping devices), and on every open for a
+            // direct (cabled) device, i.e. one that does not confirm the register query.
             List<byte> online;
             await HidppGate.Instance.WaitAsync(token);
             try { online = await receiver.Long.FindOnlineDevicesAsync(FeatureDeviceName, token); }

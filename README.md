@@ -48,7 +48,7 @@ If your Windows PC and your Mac share the same monitors, speakers and keyboard, 
 - **Your webcam on both computers** — the camera stays plugged into the PC. On the Mac it shows up as *InputBridge Camera* in Zoom, Meet, Teams or FaceTime, and it only turns on while one of those apps is actually using it.
 - **No setup files or IP addresses** — the Mac finds the PC on your network by itself, and you approve the pairing once on Windows.
 - **Stays up to date** — both apps update themselves from GitHub Releases.
-- **Battery levels at a glance** — Windows shows each wireless Logitech device as its own tray icon with the device type above the percentage; the Mac shows one menu bar item with a column per device (G915/G913, AirPods, Apple trackpads, mice and keyboards; AirPods left, right and case, or combined). Red at 15 % or less, a bolt while charging, and each computer shows only its own connected devices. Windows 11 hides new tray icons at first: pin them once in *Settings → Personalization → Taskbar → Other system tray icons*.
+- **Battery levels at a glance** — Windows shows each wireless Logitech device as its own tray icon with the device type above the percentage; the Mac shows one menu bar item with a column per device (G915/G913, AirPods, Apple trackpads, mice and keyboards; AirPods left, right and case, or combined). Red at 15 % or less while not charging, a bolt while charging, and each computer shows only its own connected devices. Windows 11 hides new tray icons at first: pin them once in *Settings → Personalization → Taskbar → Other system tray icons*.
 
 ## Screenshots
 
