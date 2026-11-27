@@ -2,10 +2,10 @@ import AppKit
 import Combine
 import IOBluetooth
 
-/// Reads the batteries of the devices connected to this Mac every 5 minutes and on wake, Bluetooth
-/// connect/disconnect and `refresh()`, and publishes what the battery columns of the InputBridge menu bar item show. Nothing is shared with the
-/// Windows controller: each machine shows only its own connected devices, and a device that disconnects
-/// disappears with the next read.
+/// Reads the batteries of the devices connected to this Mac every 5 minutes, on wake, when a Bluetooth or HID
+/// device comes or goes, and on `refresh()`, and publishes what the battery columns of the InputBridge menu bar
+/// item show. Nothing is shared with the Windows controller: each machine shows only its own connected devices,
+/// and a device that disconnects disappears with the next read, about a second later.
 ///
 /// Reads are blocking (HID++ and `system_profiler`), so they run one at a time on a serial background queue;
 /// `BatteryRefreshGate` gives triggers that arrive while a read is in flight one more cycle afterwards.
@@ -33,6 +33,12 @@ final class BatteryMonitor: NSObject, ObservableObject {
     private var gate = BatteryRefreshGate()
     private var loop: Task<Void, Never>?
     private var connectNotification: IOBluetoothUserNotification?
+    /// IOKit notifications for HID devices coming and going. Unlike IOBluetooth's, they include Bluetooth LE devices
+    /// such as the G915, and need no permission.
+    private var hidNotifications: IONotificationPortRef?
+    private var hidIterators: [io_iterator_t] = []
+    /// How long after each notification to read: a removal at once, an arrival once the device is up.
+    private var hidDelays: [io_iterator_t: TimeInterval] = [:]
     private var disconnectNotifications: [String: IOBluetoothUserNotification] = [:]
 
     init(sources: [BatterySource], enabled: Bool) {
@@ -43,6 +49,8 @@ final class BatteryMonitor: NSObject, ObservableObject {
 
     deinit {
         loop?.cancel()
+        hidIterators.forEach { IOObjectRelease($0) }
+        if let hidNotifications { IONotificationPortDestroy(hidNotifications) }
         connectNotification?.unregister()
         disconnectNotifications.values.forEach { $0.unregister() }
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -55,6 +63,7 @@ final class BatteryMonitor: NSObject, ObservableObject {
         // Also called back for devices that are already connected.
         connectNotification = IOBluetoothDevice.register(
             forConnectNotifications: self, selector: #selector(bluetoothConnected(_:device:)))
+        watchHIDDevices()
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 self?.refresh()
@@ -96,6 +105,39 @@ final class BatteryMonitor: NSObject, ObservableObject {
     private func publish() {
         let shown = enabled ? BatteryOrder.sorted(local) : []
         if shown != visible { visible = shown }
+    }
+
+    /// A HID device that goes away is hidden half a second later; one that arrives is read once it is up.
+    private func watchHIDDevices() {
+        guard let port = IONotificationPortCreate(kIOMainPortDefault) else { return }
+        IONotificationPortSetDispatchQueue(port, .main)
+        hidNotifications = port
+        let context = Unmanaged.passUnretained(self).toOpaque()
+        for (type, delay) in [(kIOTerminatedNotification, 0.5), (kIOFirstMatchNotification, 5.0)] {
+            var iterator: io_iterator_t = 0
+            let callback: IOServiceMatchingCallback = { context, iterator in
+                // Drain the iterator, or no further notification arrives.
+                var any = false
+                while case let service = IOIteratorNext(iterator), service != 0 {
+                    IOObjectRelease(service)
+                    any = true
+                }
+                guard any, let context else { return }
+                let monitor = Unmanaged<BatteryMonitor>.fromOpaque(context).takeUnretainedValue()
+                MainActor.assumeIsolated { monitor.hidDevicesChanged(iterator: iterator) }
+            }
+            guard IOServiceAddMatchingNotification(
+                port, type, IOServiceMatching("IOHIDDevice"), callback, context, &iterator) == KERN_SUCCESS
+            else { continue }
+            hidIterators.append(iterator)
+            hidDelays[iterator] = delay
+            // Arm the notification; the devices present now are not news.
+            while case let service = IOIteratorNext(iterator), service != 0 { IOObjectRelease(service) }
+        }
+    }
+
+    private func hidDevicesChanged(iterator: io_iterator_t) {
+        refresh(after: hidDelays[iterator] ?? 1)
     }
 
     @objc private func didWake(_ notification: Notification) {
