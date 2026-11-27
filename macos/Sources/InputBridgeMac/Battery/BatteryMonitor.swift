@@ -81,7 +81,7 @@ final class BatteryMonitor: NSObject, ObservableObject {
     private func startCycle() {
         let sources = BatteryOrder.sourcesToRead(all: self.sources, enabled: enabled)
         queue.async {
-            let readings = sources.flatMap { $0.read() }
+            let readings = BatteryOrder.deduplicated(sources.flatMap { $0.read() })
             Task { @MainActor in self.finishCycle(readings) }
         }
     }

@@ -31,8 +31,8 @@ final class MenuBarColumnsTests: XCTestCase {
             part(.`case`, 60), part(.right, 85), part(.left, 90),
         ])
         XCTAssertEqual(MenuBarColumns.columns([airPods], airPods: .separate), [
-            MenuBarColumn(symbol: "airpod.left", text: "90%", tone: .normal),
-            MenuBarColumn(symbol: "airpod.right", text: "85%", tone: .normal),
+            MenuBarColumn(symbol: "airpod.left", label: "L", text: "90%", tone: .normal),
+            MenuBarColumn(symbol: "airpod.right", label: "R", text: "85%", tone: .normal),
             MenuBarColumn(symbol: MenuBarColumns.caseSymbol, text: "60%", tone: .normal),
         ])
     }
@@ -82,7 +82,7 @@ final class MenuBarColumnsTests: XCTestCase {
     func testAirPodsSeparateWithSingleEarbudShowsEarbudAndCase() {
         let airPods = reading("apple:AirPods", "AirPods", .headset, [part(.right, 40), part(.`case`, 70)])
         XCTAssertEqual(MenuBarColumns.columns([airPods], airPods: .separate), [
-            MenuBarColumn(symbol: "airpod.right", text: "40%", tone: .normal),
+            MenuBarColumn(symbol: "airpod.right", label: "R", text: "40%", tone: .normal),
             MenuBarColumn(symbol: MenuBarColumns.caseSymbol, text: "70%", tone: .normal),
         ])
     }

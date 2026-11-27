@@ -5,6 +5,8 @@ struct MenuBarColumn: Equatable {
     enum Tone: Equatable { case normal, low, charging }
 
     let symbol: String   // SF Symbol name
+    /// A letter after the symbol: "L" or "R" for an earbud, whose symbols are mirror images too small to tell apart.
+    var label: String? = nil
     let text: String     // always "<percent>%"
     let tone: Tone
 }
@@ -78,15 +80,15 @@ enum MenuBarColumns {
         return components.map { component in
             switch component.role {
             case .main: return column(symbol(for: reading.kind), component)
-            case .left: return column("airpod.left", component)
-            case .right: return column("airpod.right", component)
+            case .left: return column("airpod.left", label: "L", component)
+            case .right: return column("airpod.right", label: "R", component)
             case .`case`: return column(caseSymbol, component)
             }
         }
     }
 
-    private static func column(_ symbol: String, _ component: BatteryComponent) -> MenuBarColumn {
-        MenuBarColumn(symbol: symbol, text: "\(clamped(component.percent))%", tone: tone(component))
+    private static func column(_ symbol: String, label: String? = nil, _ component: BatteryComponent) -> MenuBarColumn {
+        MenuBarColumn(symbol: symbol, label: label, text: "\(clamped(component.percent))%", tone: tone(component))
     }
 
     private static func clamped(_ percent: Int) -> Int { min(max(percent, 0), 100) }

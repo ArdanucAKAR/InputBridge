@@ -19,27 +19,34 @@ final class StatusItemView: NSView {
         static let iconSize: CGFloat = 18
         /// Before every column: after the icon, or after the previous column.
         static let columnSpacing: CGFloat = 6
-        static let symbolPointSize: CGFloat = 9
-        static let boltPointSize: CGFloat = 7
-        /// Between the device symbol and the charging bolt.
+        static let symbolPointSize: CGFloat = 8
+        static let boltPointSize: CGFloat = 6.5
+        /// Between the parts of the top row: device symbol, earbud letter, charging bolt.
         static let boltSpacing: CGFloat = 1
+        static var labelFont: NSFont { NSFont.systemFont(ofSize: 7.5, weight: .bold) }
         /// The top row is this tall in every column, so all percentages share one baseline.
-        static let topRowHeight: CGFloat = 10
+        /// With `rowSpacing` and the 13 pt cap height, about 18 pt: fits the 22 pt menu bar of a Mac without a notch.
+        static let topRowHeight: CGFloat = 7.5
         /// Between the top row and the cap height of the percentage.
-        static let rowSpacing: CGFloat = 1.5
-        static var font: NSFont { NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold) }
+        static let rowSpacing: CGFloat = 2
+        /// The columns sit this much above the button's centre, on the same line as the clock and other status items'
+        /// text, which macOS centres optically rather than geometrically.
+        static let raise: CGFloat = 1.5
+        /// The size system monitors use for the value under a small label.
+        static var font: NSFont { NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold) }
     }
 
     /// One column, measured and ready to draw.
     private struct ColumnLayout {
         let symbol: NSImage?
+        let label: NSAttributedString?
         let bolt: NSImage?
         let text: NSAttributedString
 
+        /// Symbol, letter and bolt, the ones present, with `boltSpacing` between them.
         var topRowWidth: CGFloat {
-            let symbolWidth = symbol?.size.width ?? 0
-            guard let bolt else { return symbolWidth }
-            return symbolWidth + (symbol == nil ? 0 : Metrics.boltSpacing) + bolt.size.width
+            let widths = [symbol?.size.width, label.map { ceil($0.size().width) }, bolt?.size.width].compactMap { $0 }
+            return widths.reduce(0, +) + CGFloat(max(widths.count - 1, 0)) * Metrics.boltSpacing
         }
 
         var textWidth: CGFloat { text.size().width }
@@ -85,7 +92,7 @@ final class StatusItemView: NSView {
     private func drawColumns() {
         let font = Metrics.font
         let contentHeight = Metrics.topRowHeight + Metrics.rowSpacing + font.capHeight
-        let baseline = aligned((bounds.height - contentHeight) / 2)
+        let baseline = aligned((bounds.height - contentHeight) / 2 + Metrics.raise)
         let topRowMidY = baseline + font.capHeight + Metrics.rowSpacing + Metrics.topRowHeight / 2
 
         var x = Metrics.iconSize
@@ -98,6 +105,16 @@ final class StatusItemView: NSView {
             if let symbol = layout.symbol {
                 drawImage(symbol, x: symbolX, midY: topRowMidY)
                 symbolX += symbol.size.width + Metrics.boltSpacing
+            }
+            if let label = layout.label {
+                // Centre the letter's capitals on the row, like the symbols.
+                let labelFont = Metrics.labelFont
+                label.draw(
+                    with: NSRect(
+                        x: aligned(symbolX), y: aligned(topRowMidY - labelFont.capHeight / 2),
+                        width: ceil(label.size().width), height: labelFont.capHeight),
+                    options: [])
+                symbolX += ceil(label.size().width) + Metrics.boltSpacing
             }
             if let bolt = layout.bolt {
                 drawImage(bolt, x: symbolX, midY: topRowMidY)
@@ -123,8 +140,12 @@ final class StatusItemView: NSView {
     private func measure(_ column: MenuBarColumn, color: NSColor) -> ColumnLayout {
         let bolt = column.tone == .charging ? Self.symbol("bolt.fill", pointSize: Metrics.boltPointSize, color: color) : nil
         let text = NSAttributedString(string: column.text, attributes: [.font: Metrics.font, .foregroundColor: color])
+        let label = column.label.map {
+            NSAttributedString(string: $0, attributes: [.font: Metrics.labelFont, .foregroundColor: color])
+        }
         return ColumnLayout(
             symbol: Self.symbol(column.symbol, pointSize: Metrics.symbolPointSize, color: color),
+            label: label,
             bolt: bolt,
             text: text)
     }

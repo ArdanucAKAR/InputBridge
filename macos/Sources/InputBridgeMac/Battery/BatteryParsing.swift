@@ -89,33 +89,44 @@ enum HIDPPBattery {
     }
 }
 
+/// One connected device from `system_profiler SPBluetoothDataType`, with the battery levels it lists.
 struct ProfilerDevice: Equatable {
     let name: String
-    let left: Int?
-    let right: Int?
-    let caseLevel: Int?
+    var left: Int? = nil
+    var right: Int? = nil
+    var caseLevel: Int? = nil
+    /// `Battery Level`: a device with one battery, e.g. a Bluetooth LE keyboard reporting the GATT battery service.
+    var main: Int? = nil
+    /// `Vendor ID`, e.g. `0x046D`.
+    var vendorID: String? = nil
+    /// `Minor Type`, e.g. `Keyboard`, `Mouse`, `Headphones`.
+    var minorType: String? = nil
+
+    var hasEarbuds: Bool { left != nil || right != nil }
 }
 
-/// Reads AirPods-style battery levels from `system_profiler SPBluetoothDataType` output (run with `LC_ALL=C`).
+/// Reads battery levels from `system_profiler SPBluetoothDataType` output. The percent sign can come first or last
+/// (`%80` in Turkish, `80%` in English): system_profiler formats numbers with the user's region even with `LC_ALL=C`.
 enum SystemProfilerParser {
+    static let appleVendorID = "0x004C"
+
     /// Devices under `Connected:` that report a left or right earbud level; `Not Connected:` is ignored.
     static func connectedEarbuds(_ output: String) -> [ProfilerDevice] {
+        connectedDevices(output).filter(\.hasEarbuds)
+    }
+
+    /// Devices under `Connected:` that report any battery level, in output order; `Not Connected:` is ignored.
+    static func connectedDevices(_ output: String) -> [ProfilerDevice] {
         var devices: [ProfilerDevice] = []
         var connectedIndent: Int?
         var deviceIndent: Int?
-        var deviceName: String?
-        var levels: [String: Int] = [:]
+        var device: ProfilerDevice?
 
         func finishDevice() {
-            if let name = deviceName, levels["Left Battery Level"] != nil || levels["Right Battery Level"] != nil {
-                devices.append(ProfilerDevice(
-                    name: name,
-                    left: levels["Left Battery Level"],
-                    right: levels["Right Battery Level"],
-                    caseLevel: levels["Case Battery Level"]))
+            if let device, device.hasEarbuds || device.main != nil {
+                devices.append(device)
             }
-            deviceName = nil
-            levels = [:]
+            device = nil
         }
 
         for rawLine in output.split(whereSeparator: { $0.isNewline }) {
@@ -128,12 +139,18 @@ enum SystemProfilerParser {
                     if text.hasSuffix(":"), deviceIndent == nil || indent <= deviceIndent! {
                         finishDevice()
                         deviceIndent = indent
-                        deviceName = String(text.dropLast())
-                    } else if deviceName != nil, let separator = text.range(of: ": ") {
+                        device = ProfilerDevice(name: String(text.dropLast()))
+                    } else if device != nil, let separator = text.range(of: ": ") {
                         let key = String(text[..<separator.lowerBound])
-                        let value = text[separator.upperBound...]
-                        if value.hasSuffix("%"), let percent = Int(value.dropLast()) {
-                            levels[key] = percent
+                        let value = String(text[separator.upperBound...])
+                        switch key {
+                        case "Left Battery Level": device?.left = percent(value)
+                        case "Right Battery Level": device?.right = percent(value)
+                        case "Case Battery Level": device?.caseLevel = percent(value)
+                        case "Battery Level": device?.main = percent(value)
+                        case "Vendor ID": device?.vendorID = value
+                        case "Minor Type": device?.minorType = value
+                        default: break
                         }
                     }
                     continue
@@ -148,6 +165,55 @@ enum SystemProfilerParser {
         }
         finishDevice()
         return devices
+    }
+
+    /// Readings for the connected devices:
+    /// - earbuds (left/right, and the case when listed) as one headset reading;
+    /// - a single `Battery Level` of a non-Apple device, e.g. the G915 on Bluetooth LE. Apple mice, keyboards and
+    ///   trackpads are left to the IORegistry, which names them by product. A device matching `keyboardPattern`
+    ///   gets the shared keyboard id, so the HID++ reading of the same keyboard (which knows when it charges) can
+    ///   replace it.
+    static func readings(_ output: String, keyboardPattern: NSRegularExpression, readAt: Date) -> [BatteryReading] {
+        connectedDevices(output).compactMap { device -> BatteryReading? in
+            if device.hasEarbuds {
+                var components: [BatteryComponent] = []
+                if let left = device.left { components.append(component(.left, left)) }
+                if let right = device.right { components.append(component(.right, right)) }
+                if let caseLevel = device.caseLevel { components.append(component(.`case`, caseLevel)) }
+                return BatteryReading(
+                    deviceId: "apple:" + device.name, name: device.name, kind: .headset,
+                    components: components, readAt: readAt)
+            }
+            guard let main = device.main, device.vendorID?.uppercased() != appleVendorID.uppercased() else { return nil }
+            let range = NSRange(device.name.startIndex..<device.name.endIndex, in: device.name)
+            let isKeyboard = keyboardPattern.firstMatch(in: device.name, options: [], range: range) != nil
+            return BatteryReading(
+                deviceId: isKeyboard ? BatteryIds.sharedKeyboard : "bluetooth:" + device.name,
+                name: device.name,
+                kind: isKeyboard ? .keyboard : kind(minorType: device.minorType),
+                components: [component(.main, main)],
+                readAt: readAt)
+        }
+    }
+
+    static func kind(minorType: String?) -> DeviceKind {
+        guard let type = minorType?.lowercased() else { return .other }
+        if type.contains("keyboard") { return .keyboard }
+        if type.contains("mouse") { return .mouse }
+        if type.contains("trackpad") { return .trackpad }
+        if type.contains("head") || type.contains("earbud") { return .headset }
+        return .other
+    }
+
+    /// `80%`, `%80`, `80 %` or `% 80`.
+    private static func percent(_ value: String) -> Int? {
+        let digits = value.trimmingCharacters(in: CharacterSet(charactersIn: "% \u{00A0}"))
+        guard value.contains("%"), let number = Int(digits) else { return nil }
+        return number
+    }
+
+    private static func component(_ role: ComponentRole, _ percent: Int) -> BatteryComponent {
+        BatteryComponent(role: role, percent: min(max(percent, 0), 100), charging: false)
     }
 }
 

@@ -1,29 +1,27 @@
 import Foundation
 import IOKit
 
-/// Apple Bluetooth peripherals: trackpad, mouse and keyboard from the IORegistry, AirPods-style earbuds from
-/// `system_profiler`. Devices matching `excluding` (the keyboard name pattern) are left out, because the
-/// Logitech source reports that keyboard.
+/// Bluetooth peripherals as macOS itself reports them: Apple trackpads, mice and keyboards from the IORegistry;
+/// AirPods-style earbuds and other devices with one battery level (such as the G915 on Bluetooth LE) from
+/// `system_profiler`. Needs no permission. The keyboard matching `keyboardPattern` gets the shared keyboard id,
+/// so `BatteryOrder.deduplicated` drops it when the Logitech HID++ source, read first, already has it.
 struct AppleBatterySource: BatterySource {
     private static let profilerTimeout: TimeInterval = 10
 
-    private let excluding: @Sendable () -> NSRegularExpression
+    private let keyboardPattern: @Sendable () -> NSRegularExpression
 
-    init(excluding: @escaping @Sendable () -> NSRegularExpression) {
-        self.excluding = excluding
+    init(keyboardPattern: @escaping @Sendable () -> NSRegularExpression) {
+        self.keyboardPattern = keyboardPattern
     }
 
-    var name: String { "Apple devices" }
+    var name: String { "Bluetooth devices" }
 
     func read() -> [BatteryReading] {
-        let pattern = excluding()
-        var seen = Set<String>()
-        return (Self.hidReadings() + Self.earbudReadings()).filter { reading in
-            let range = NSRange(reading.name.startIndex..<reading.name.endIndex, in: reading.name)
-            guard pattern.firstMatch(in: reading.name, options: [], range: range) == nil else { return false }
-            // A peripheral can expose several HID services; keep the first reading per device.
-            return seen.insert(reading.deviceId).inserted
-        }
+        // A peripheral can expose several HID services; BatteryOrder.deduplicated keeps one reading per device.
+        let profiler = Self.runSystemProfiler().map {
+            SystemProfilerParser.readings($0, keyboardPattern: keyboardPattern(), readAt: Date())
+        } ?? []
+        return Self.hidReadings() + profiler
     }
 
     /// `AppleDeviceManagementHIDEventService` entries that publish `Product` and `BatteryPercent`.
@@ -52,25 +50,6 @@ struct AppleBatterySource: BatterySource {
 
     private static func property(_ service: io_service_t, _ key: String) -> Any? {
         IORegistryEntryCreateCFProperty(service, key as CFString, kCFAllocatorDefault, 0)?.takeRetainedValue()
-    }
-
-    /// One headset reading per connected device that reports earbud levels; a component per level present.
-    private static func earbudReadings() -> [BatteryReading] {
-        guard let output = runSystemProfiler() else { return [] }
-        return SystemProfilerParser.connectedEarbuds(output).compactMap { (device) -> BatteryReading? in
-            var components: [BatteryComponent] = []
-            if let left = device.left { components.append(component(.left, left)) }
-            if let right = device.right { components.append(component(.right, right)) }
-            if let caseLevel = device.caseLevel { components.append(component(.`case`, caseLevel)) }
-            guard !components.isEmpty else { return nil }
-            return BatteryReading(
-                deviceId: "apple:" + device.name, name: device.name, kind: .headset,
-                components: components, readAt: Date())
-        }
-    }
-
-    private static func component(_ role: ComponentRole, _ percent: Int) -> BatteryComponent {
-        BatteryComponent(role: role, percent: min(max(percent, 0), 100), charging: false)
     }
 
     /// `system_profiler SPBluetoothDataType` output, or nil when it fails or takes longer than `profilerTimeout`

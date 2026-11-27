@@ -7,6 +7,13 @@ enum BatteryOrder {
         readings.sorted(by: precedes)
     }
 
+    /// The first reading of each device, in the order given. Sources are read in priority order, so a keyboard read
+    /// over HID++ (with its charging state) wins over the same keyboard listed by system_profiler.
+    static func deduplicated(_ readings: [BatteryReading]) -> [BatteryReading] {
+        var seen = Set<String>()
+        return readings.filter { seen.insert($0.deviceId).inserted }
+    }
+
     /// Every source while "Show battery levels" is on; none while it is off, so a disabled monitor reads nothing.
     static func sourcesToRead(all: [BatterySource], enabled: Bool) -> [BatterySource] {
         enabled ? all : []

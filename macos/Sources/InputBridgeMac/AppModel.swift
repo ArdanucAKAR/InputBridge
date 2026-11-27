@@ -55,7 +55,7 @@ final class AppModel: ObservableObject {
     private lazy var battery: BatteryMonitor = BatteryMonitor(
         sources: [
             LogitechBluetoothBatterySource(pattern: { AppModel.savedKeyboardPattern() }),
-            AppleBatterySource(excluding: { AppModel.savedKeyboardPattern() }),
+            AppleBatterySource(keyboardPattern: { AppModel.savedKeyboardPattern() }),
         ],
         enabled: batteryIndicatorsEnabled)
 
@@ -185,8 +185,9 @@ final class AppModel: ObservableObject {
     func detected(_ mode: ProfileMode) async {
         currentMode = mode
         updateKeyboardPolling(keyboardOnMac: mode == .mac)
-        // The keyboard just arrived on or left this Mac; give it a moment to come up before reading.
-        battery.refresh(after: 5)
+        // The keyboard left this Mac: drop its column right away. It arrived: give it a moment to come up first.
+        // It is on Bluetooth LE, which IOBluetooth's connect and disconnect notifications do not report.
+        battery.refresh(after: mode == .mac ? 5 : 1)
         if let last = lastApplied, last.mode == mode, Date().timeIntervalSince(last.at) < 20 {
             return // the keyboard moved because InputBridge just applied this profile
         }

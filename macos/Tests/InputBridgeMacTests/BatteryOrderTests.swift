@@ -38,4 +38,12 @@ final class BatteryOrderTests: XCTestCase {
         XCTAssertTrue(BatteryOrder.sourcesToRead(all: [a, b], enabled: false).isEmpty)
         XCTAssertEqual(BatteryOrder.sourcesToRead(all: [a, b], enabled: true).count, 2)
     }
+
+    func testDeduplicatedKeepsTheFirstReadingPerDevice() {
+        let hidpp = reading(BatteryIds.sharedKeyboard, "G915 TKL", .keyboard, percent: 82)
+        let profiler = reading(BatteryIds.sharedKeyboard, "G915 TKL", .keyboard, percent: 100)
+        let trackpad = reading("apple:Magic Trackpad", "Magic Trackpad", .trackpad)
+        XCTAssertEqual(BatteryOrder.deduplicated([hidpp, trackpad, profiler]), [hidpp, trackpad])
+        XCTAssertEqual(BatteryOrder.deduplicated([trackpad, profiler]), [trackpad, profiler])
+    }
 }
