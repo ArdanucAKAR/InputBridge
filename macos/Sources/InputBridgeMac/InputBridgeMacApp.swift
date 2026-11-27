@@ -453,6 +453,43 @@ private struct ControllerPane: View {
     }
 }
 
+/// Whether InputBridge may talk to the keyboard over HID++ (Input Monitoring), with a button to allow it. The keyboard
+/// switch and the keyboard's charging state need it; the battery level alone does not.
+private struct InputMonitoringRow: View {
+    /// Called when access turns granted while the settings window is open.
+    let onGranted: () -> Void
+    @State private var access = InputMonitoring.access
+
+    var body: some View {
+        LabeledContent("Input Monitoring") {
+            HStack(spacing: 8) {
+                switch access {
+                case .granted:
+                    Label("Allowed", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                case .notDetermined:
+                    Button("Allow…") {
+                        InputMonitoring.request()
+                        refresh()
+                    }
+                case .denied:
+                    Text("Not allowed").foregroundStyle(.secondary)
+                    Button("Open Settings…") { InputMonitoring.openSettings() }
+                }
+            }
+        }
+        .onAppear(perform: refresh)
+        // Coming back from System Settings, or from the system prompt.
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
+    }
+
+    private func refresh() {
+        let now = InputMonitoring.access
+        if now == .granted && access != .granted { onGranted() }
+        access = now
+    }
+}
+
 private struct DevicesPane: View {
     @ObservedObject var model: AppModel
     @ObservedObject var z407: Z407Controller
@@ -469,10 +506,11 @@ private struct DevicesPane: View {
 
             Section {
                 Toggle("Switch the keyboard with the profile", isOn: $model.keyboardSwitchEnabled)
+                InputMonitoringRow { model.refreshBatteries() }
             } header: {
                 Text("Keyboard connection")
             } footer: {
-                Text("Mac profile: the Windows PC moves the keyboard to Bluetooth. Windows profile: this Mac sends it back to LIGHTSPEED. macOS may ask to allow InputBridge under Privacy & Security → Input Monitoring.")
+                Text("Mac profile: the Windows PC moves the keyboard to Bluetooth. Windows profile: this Mac sends it back to LIGHTSPEED. Sending it back, and showing when it charges, need Input Monitoring.")
             }
 
             Section {

@@ -8,6 +8,8 @@ final class HIDPPSession {
     private static let deviceIndex: UInt8 = 0xFF
     private static let reportLength = 20
     private static let notPermitted = IOReturn(bitPattern: 0xE000_02E2)
+    /// kIOReturnExclusiveAccess: another process seized the device (Karabiner-Elements does this to keyboards it modifies).
+    private static let exclusiveAccess = IOReturn(bitPattern: 0xE000_02C5)
 
     private let device: IOHIDDevice
     private let softwareID: UInt8
@@ -35,6 +37,9 @@ final class HIDPPSession {
                     _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
                 }
                 throw LogitechBluetoothKeyboard.KeyboardError.inputMonitoringRequired
+            }
+            if result == Self.exclusiveAccess {
+                throw LogitechBluetoothKeyboard.KeyboardError.inUseByAnotherApp
             }
             throw LogitechBluetoothKeyboard.KeyboardError.openFailed(result)
         }

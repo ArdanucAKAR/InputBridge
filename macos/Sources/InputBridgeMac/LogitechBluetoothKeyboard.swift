@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import IOKit.hid
 import os
@@ -8,6 +9,8 @@ import os
 enum LogitechBluetoothKeyboard {
     enum KeyboardError: LocalizedError {
         case inputMonitoringRequired
+        /// Another process has the keyboard to itself, typically Karabiner-Elements while it modifies the keyboard.
+        case inUseByAnotherApp
         case openFailed(IOReturn)
         case writeFailed(IOReturn)
         case noReply
@@ -18,6 +21,8 @@ enum LogitechBluetoothKeyboard {
             switch self {
             case .inputMonitoringRequired:
                 return "allow InputBridge in System Settings → Privacy & Security → Input Monitoring, then try again."
+            case .inUseByAnotherApp:
+                return "another app has the keyboard to itself. In Karabiner-Elements, turn off Modify events for it under Devices."
             case .openFailed(let code):
                 return "could not open the keyboard (IOReturn 0x\(String(UInt32(bitPattern: code), radix: 16)))."
             case .writeFailed(let code):
@@ -241,6 +246,30 @@ struct LogitechBluetoothBatterySource: BatterySource {
             let description = LogitechBluetoothKeyboard.describe(error)
             BatteryLog.logger.error("Keyboard battery read failed: \(description, privacy: .public)")
             return []
+        }
+    }
+}
+
+/// The Input Monitoring permission (TCC ListenEvent), which opening the keyboard's HID++ collection needs.
+enum InputMonitoring {
+    enum Access { case granted, denied, notDetermined }
+
+    static var access: Access {
+        switch IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) {
+        case kIOHIDAccessTypeGranted: return .granted
+        case kIOHIDAccessTypeDenied: return .denied
+        default: return .notDetermined
+        }
+    }
+
+    /// Shows the system prompt when the user has not decided yet; adds InputBridge, switched off, to the list otherwise.
+    static func request() {
+        _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+    }
+
+    static func openSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
+            NSWorkspace.shared.open(url)
         }
     }
 }

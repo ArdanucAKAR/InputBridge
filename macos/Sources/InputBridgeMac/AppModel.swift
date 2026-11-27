@@ -182,6 +182,11 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Reads the batteries again now, e.g. after Input Monitoring was allowed.
+    func refreshBatteries() {
+        battery.refresh()
+    }
+
     func detected(_ mode: ProfileMode) async {
         currentMode = mode
         updateKeyboardPolling(keyboardOnMac: mode == .mac)
