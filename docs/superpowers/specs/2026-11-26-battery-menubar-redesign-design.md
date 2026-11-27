@@ -106,3 +106,35 @@ Kullanıcı sonucu tarif etti, nasıl yapılacağını bize bıraktı. 2 numara 
   - dar menü çubuğu,
   - ayar anahtarları,
   - Bluetooth bağlantısı kopunca sütunun silinmesi.
+
+## Mac'te doğrulama (2026-11-28)
+
+Uygulama gerçek bir Mac'te derlenip çalıştırıldı; menü çubuğu ekran görüntüleriyle karşılaştırıldı.
+
+**Bulunan kök nedenler**
+
+- **G915 görünmüyordu.** Giriş İzleme kaydı eski, ad-hoc imzalı bir derlemeye aitti (`tccd`: "Failed to match
+  existing code requirement"). Ayarlarda açık görünse de Developer ID imzalı uygulama reddediliyordu.
+  `tccutil reset ListenEvent com.inputbridge.mac` ve yeniden izin ile düzeldi. Ayarlar → Devices artık izin durumunu
+  gösterir ve izin istemeye yarar.
+- **İzin verildikten sonra da HID++ açılamıyor.** Karabiner-Elements değiştirdiği klavyeyi tek başına tutar
+  (`kIOReturnExclusiveAccess`). Bu durumda şarj şimşeği ve Mac → Windows klavye geçişi çalışmaz; kayıt ve hata
+  mesajı bunu söyler. Karabiner'de G915 için "Modify events" kapatılınca çalışır.
+- **Yüzde yine de görünür.** G915 Bluetooth LE ile bağlı; `system_profiler` "Battery Level" değerini izin
+  gerektirmeden verir. HID++ okuması mümkünse onu geçer.
+- **AirPods hiç okunmuyordu.** `system_profiler` Türkçe bölge ayarında `%80` yazar (`LC_ALL=C` ile de).
+- **Kopma geç fark ediliyordu.** BLE cihazlar IOBluetooth bildirimi göndermez; IOKit HID bildirimleri eklendi.
+  Ölçüm: kopmadan ~1 sn sonra sütun gider, dönüşten ~5,5 sn sonra gelir.
+
+**Görünüm**
+
+- Yüzde 13 pt; sütunlar Stats'ınkilerle aynı satırda (piksel ölçümü). Sol/sağ kulaklık simgeleri menü çubuğu
+  boyutunda ayırt edilemediği için yanlarına "L"/"R" harfi eklendi.
+
+**Kontrol listesi**
+
+- Koyu menü çubuğu ve koyu duvar kâğıdı üstünde açık mod: ekranda doğrulandı. Açık renk menü çubuğu: ekran
+  dışı çizimle doğrulandı (açık duvar kâğıdı yoktu).
+- Tıkla aç, tekrar tıkla kapat (yeniden açılmaz), ⌘, ayarlar, "Show battery levels", Bluetooth kopması: ekranda
+  doğrulandı. AirPods tek/ayrı ile düşük ve şarj tonları: sahte okumalarla ekranda doğrulandı (AirPods bağlı değildi).
+- Çentikli ekran: bu Mac'te yok, denenmedi.
